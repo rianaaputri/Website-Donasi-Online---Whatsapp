@@ -11,13 +11,15 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules;
 use Illuminate\View\View;
+use App\Models\Otp;
+use Carbon\Carbon;
 
-class RegisteredUserController extends Controller
+class RegisterController extends Controller
 {
     /**
      * Display the registration view.
      */
-    public function create(): View
+    public function register(): View
     {
         return view('auth.register');
     }
@@ -26,12 +28,12 @@ class RegisteredUserController extends Controller
     $otp = rand(100000, 999999);
 
     // Simpan ke DB
-    Otp::create([
-        'user_id'   => Auth::id(),
-        'phone'     => $phone,
-        'code'      => $otp,
-        'expired_at'=> Carbon::now()->addMinutes(1),
-    ]);
+   Otp::create([
+    'phone'      => $phone,
+    'code'       => $otp,
+    'expired_at' => Carbon::now()->addMinutes(1),
+]);
+
 
     // Kirim WA
     $pesan = "Kode OTP untuk verifikasi nomor WA $nama adalah: $otp. Berlaku 1 menit.";
@@ -42,8 +44,10 @@ class RegisteredUserController extends Controller
      *
      * @throws \Illuminate\Validation\ValidationException
      */
-    public function store(Request $request): RedirectResponse
+    public function submitRegister(Request $request): RedirectResponse
     {
+
+        
         $validate = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'phone' => ['required', 'string', 'min:10', 'unique:' . User::class],
@@ -121,6 +125,6 @@ public function submitOtp(Request $request)
     session()->forget('pending_register');
     auth()->login($user);
 
-    return redirect()->route('home.index')->with('sukses', 'Registrasi berhasil!');
+    return redirect()->route('home')->with('sukses', 'Registrasi berhasil!');
 }
 }

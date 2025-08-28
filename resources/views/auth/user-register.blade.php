@@ -407,18 +407,18 @@
         <div id="nameValidation" class="validation-message" style="display: none;"></div>
       </div>
 
-      {{-- Email Field --}}
+      {{-- Phone Field --}}
       <div class="form-floating">
-        <input type="email" class="form-control @error('email') is-invalid @enderror" 
-               id="email" name="email" placeholder="Email Gmail" 
-               value="{{ old('email') }}" required autocomplete="email">
-        <label for="email">
-          <i class="bi bi-envelope me-2"></i>Email Gmail
+        <input type="number" class="form-control @error('phone') is-invalid @enderror" 
+               id="phone" name="phone" placeholder="phone" 
+               value="{{ old('phone') }}" required autocomplete="phone">
+        <label for="phone">
+          <i class="bi bi-envelope me-2"></i>phone 
         </label>
-        @error('email')
+        @error('phone')
           <div class="validation-message error">{{ $message }}</div>
         @enderror
-        <div id="emailValidation" class="validation-message" style="display: none;"></div>
+        <div id="phoneValidation" class="validation-message" style="display: none;"></div>
       </div>
 
       {{-- Password Field --}}
@@ -477,11 +477,7 @@
       empty: "Nama tidak boleh kosong ya!",
       tooShort: "Nama minimal 2 karakter ya!"
     },
-    email: {
-      invalid: "Email harus menggunakan @gmail.com ya!",
-      empty: "Email tidak boleh kosong ya!",
-      notGmail: "Email harus menggunakan @gmail.com ya!"
-    },
+    
     password: {
       tooShort: "Password minimal 6 karakter ya biar aman!"
     },
@@ -541,24 +537,6 @@
     return { valid: true };
   }
 
-  function validateEmail(email) {
-    if (!email.trim()) {
-      return { valid: false, message: friendlyMessages.email.empty };
-    }
-
-    const emailLower = email.toLowerCase();
-    if (!emailLower.endsWith('@gmail.com')) {
-      return { valid: false, message: friendlyMessages.email.notGmail };
-    }
-    
-    // Check basic email format for gmail
-    const gmailPattern = /^[a-zA-Z0-9._%+-]+@gmail\.com$/i;
-    if (!gmailPattern.test(email)) {
-      return { valid: false, message: friendlyMessages.email.invalid };
-    }
-    
-    return { valid: true };
-  }
 
   function validatePassword(password) {
     if (password.length < 6) {
@@ -576,12 +554,12 @@
 
   function isFormValid() {
     const name = document.getElementById('name').value;
-    const email = document.getElementById('email').value;
+    const phone = document.getElementById('phone').value;
     const password = document.getElementById('password').value;
     const confirmPassword = document.getElementById('password_confirmation').value;
 
     return validateName(name).valid &&
-           validateEmail(email).valid &&
+           validatePhone(phone).valid &&
            validatePassword(password).valid &&
            validateConfirmPassword(password, confirmPassword).valid;
   }
@@ -598,7 +576,7 @@
   document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('registerForm');
     const nameField = document.getElementById('name');
-    const emailField = document.getElementById('email');
+    const phoneField = document.getElementById('phone');
     const passwordField = document.getElementById('password');
     const confirmPasswordField = document.getElementById('password_confirmation');
 
@@ -614,12 +592,12 @@
       updateSubmitButtonVisual();
     });
 
-    emailField.addEventListener('input', function() {
-      const validation = validateEmail(this.value);
+    phoneField.addEventListener('input', function() {
+      const validation = validatePhone(this.value);
       if (this.value.length > 0 && !validation.valid) {
-        showValidationMessage('email', validation.message, 'error');
+        showValidationMessage('phone', validation.message, 'error');
       } else {
-        hideValidationMessage('email');
+        hideValidationMessage('phone');
       }
       updateSubmitButtonVisual();
     });

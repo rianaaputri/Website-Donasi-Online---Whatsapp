@@ -127,7 +127,7 @@
     }
 
     input[type="text"],
-    input[type="email"],
+    input[type="phone"],
     input[type="password"] {
       border: 2px solid var(--border-color);
       border-radius: 16px;
@@ -141,7 +141,7 @@
     }
 
     input[type="text"]:focus,
-    input[type="email"]:focus,
+    input[type="phone"]:focus,
     input[type="password"]:focus {
       border-color: var(--accent-blue);
       box-shadow: 0 0 0 4px rgba(100, 181, 246, 0.1);
@@ -235,9 +235,7 @@
           @if(str_contains(session('success'), 'Akun berhasil'))
             <br><a href="{{ route('login') }}" class="text-white fw-bold">Klik di sini untuk login</a>
           @endif
-          @if(str_contains(session('success'), 'verifikasi'))
-            <br><a href="{{ route('verification.notice') }}" class="text-white fw-bold">Klik di sini untuk verifikasi email</a>
-          @endif
+          
         </div>
         <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
       </div>
@@ -247,12 +245,7 @@
   @if(session('error'))
     <div class="toast align-items-center text-bg-danger border-0 show" role="alert">
       <div class="d-flex">
-        <div class="toast-body">
-          {!! session('error') !!}
-          @if(str_contains(session('error'), 'verifikasi'))
-            <br><a href="{{ route('verification.notice') }}" class="text-white fw-bold">Klik di sini untuk verifikasi email</a>
-          @endif
-        </div>
+        
         <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
       </div>
     </div>
@@ -261,12 +254,7 @@
   @if(session('warning'))
     <div class="toast align-items-center text-bg-warning border-0 show" role="alert">
       <div class="d-flex">
-        <div class="toast-body">
-          {!! session('warning') !!}
-          @if(str_contains(session('warning'), 'verifikasi'))
-            <br><a href="{{ route('verification.notice') }}" class="fw-bold">Klik di sini untuk verifikasi email</a>
-          @endif
-        </div>
+       
         <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast"></button>
       </div>
     </div>
@@ -289,9 +277,9 @@
       <p>Lengkapi data di bawah untuk membuat akun!</p>
     </div>
 
-    <form method="POST" action="{{ route('register') }}" id="registerForm">
+    <form method="POST" action="{{ route('register.submit') }}">
       @csrf
-
+    <input type="hidden" name="role" value="user">
       <!-- Name -->
       <div class="form-group">
         <div class="floating-label">
@@ -304,11 +292,11 @@
         <div id="nameMessage"></div>
       </div>
 
-      <!-- Email -->
-      <div class="form-group mt-4">
+      <!-- Phone -->
+        <div class="form-group mt-4">
         <div class="floating-label">
           <input id="phone" type="number" name="phone" value="{{ old('phone') }}" required placeholder="phone " />
-          <label for="phone"><i class="bi bi-envelope"></i> phone (Gmail)</label>
+          <label for="phone"><i class="bi bi-envelope"></i> phone</label>
         </div>
         @error('phone')
           <div class="error-message bounce-in">{{ $message }}</div>
@@ -361,7 +349,7 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
   const friendlyMessages = {
-    email: { invalid: "Email harus pakai format @gmail.com ya!", noAt: "Email harus pakai format @gmail.com ya!" },
+
     password: { tooShort: "Password minimal 6 karakter ya biar aman!" },
     confirmPassword: {
       tooShort: "Password ga sama nih! Coba cek lagi ya!",
@@ -424,8 +412,8 @@
       toggle.addEventListener('keydown',function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); this.click(); } });
     });
     form.addEventListener('submit',function(e){
-      const isNameValid=validateName(), isEmailValid=validateEmail(), isPasswordValid=validatePassword(), isPasswordConfirmValid=validatePasswordConfirmation();
-      if(!isNameValid||!isEmailValid||!isPasswordValid||!isPasswordConfirmValid){ e.preventDefault(); window.scrollTo({top:0,behavior:'smooth'}); return false; }
+      const isNameValid=validateName(), isPhoneValid=validatePhone(), isPasswordValid=validatePassword(), isPasswordConfirmValid=validatePasswordConfirmation();
+      if(!isNameValid||!isPhoneValid||!isPasswordValid||!isPasswordConfirmValid){ e.preventDefault(); window.scrollTo({top:0,behavior:'smooth'}); return false; }
     });
   });
 </script>
