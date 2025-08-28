@@ -24,6 +24,9 @@ class User extends Authenticatable implements MustVerifyEmail
         'role',
         'is_active',
         'avatar',
+        'otp',             // ➕ untuk menyimpan kode OTP
+        'otp_expires_at',  // ➕ waktu kadaluarsa OTP
+        'is_verified',     // ➕ status verifikasi via OTP
     ];
 
     /**
@@ -32,6 +35,7 @@ class User extends Authenticatable implements MustVerifyEmail
     protected $hidden = [
         'password',
         'remember_token',
+        'otp', // ➕ jangan tampilkan OTP di API/json
     ];
 
     /**
@@ -41,6 +45,8 @@ class User extends Authenticatable implements MustVerifyEmail
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
         'is_active' => 'boolean',
+        'otp_expires_at' => 'datetime', // ➕ otomatis cast ke Carbon
+        'is_verified' => 'boolean',     // ➕ otomatis cast ke boolean
     ];
 
     /**
@@ -80,7 +86,6 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function getTotalDonatedAttribute(): float
     {
-        // pastikan donations punya scopeSuccess()
         return (float) $this->donations()->success()->sum('amount');
     }
 
@@ -121,11 +126,11 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
-     * Scope: Filter verified users
+     * Scope: Filter verified users (OTP sudah valid)
      */
-    public function scopeVerified($query)
+    public function scopeOtpVerified($query)
     {
-        return $query->whereNotNull('email_verified_at');
+        return $query->where('is_verified', true);
     }
 
     /**

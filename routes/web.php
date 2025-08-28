@@ -1,49 +1,68 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+
+/*
+|---------------------------------------------------------------------------
+| Controller imports
+|---------------------------------------------------------------------------
+|
+| Pastikan semua controller di bawah benar-benar ada di app/Http/Controllers.
+| Jika beberapa controller berada di subfolder, sesuaikan namespace import.
+|
+*/
 use App\Http\Controllers\{
     HomeController,
     AdminController,
     MidtransController,
-    UserController,
     ProfileController,
     DonationController,
     SupportController,
-    Auth\LoginController,
-    Auth\PasswordResetLinkController,
-    Auth\NewPasswordController,
     AdminDashboardController,
     CampaignController
 };
-use App\Http\Controllers\Auth\PasswordController;
-use App\Http\Controllers\Admin\DonationController as AdminDonationController;
-use App\Http\Controllers\Admin\CampaignController as AdminCampaignController;
-use App\Http\Controllers\Admin\UserController as AdminUserController;
+
+use App\Http\Controllers\Auth\{
+    LoginController,
+    RegisteredUserController,
+    PasswordResetLinkController,
+    NewPasswordController,
+    VerificationController, // optional
+    OtpController,          // OTP controller (verify & resend)
+    CampaignCreatorRegisterController
+};
+
+use App\Http\Controllers\Admin\{
+    DonationController as AdminDonationController,
+    CampaignController as AdminCampaignController,
+    UserController as AdminUserController
+};
+
 use App\Http\Controllers\User\CampaignController as UserCampaignController;
-use App\Http\Controllers\Auth\VerificationController;
-use App\Http\Controllers\Auth\CampaignCreatorRegisterController;
 use App\Http\Controllers\Creator\CreatorDashboardController;
 
 /*
-|--------------------------------------------------------------------------
+|---------------------------------------------------------------------------
 | Public Routes
-|--------------------------------------------------------------------------
+|---------------------------------------------------------------------------
 */
 Route::get('/', [HomeController::class, 'index'])->name('home');
 Route::get('/campaign/{id}', [HomeController::class, 'showCampaign'])->name('campaign.show');
 Route::get('/campaign-detail/{id}', [CampaignController::class, 'detail'])->name('campaign.detail');
 
 /*
-|--------------------------------------------------------------------------
+|---------------------------------------------------------------------------
 | Auth (Guest Only)
-|--------------------------------------------------------------------------
+|---------------------------------------------------------------------------
 */
 Route::middleware('guest')->group(function () {
+    // Login
     Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
     Route::post('/login', [LoginController::class, 'login']);
 
-    Route::get('/register', [UserController::class, 'showRegister'])->name('register');
-    Route::post('/register', [UserController::class, 'register']);
+    // Register (gunakan RegisteredUserController yang sudah kita perbaiki)
+    Route::get('/register', [RegisteredUserController::class, 'create'])->name('register');
+    Route::post('/register', [RegisteredUserController::class, 'store']);
 
     // Password Reset
     Route::get('/forgot-password', [PasswordResetLinkController::class, 'create'])->name('password.request');
@@ -53,13 +72,13 @@ Route::middleware('guest')->group(function () {
     Route::post('/reset-password', [NewPasswordController::class, 'store'])->name('password.update');
 });
 
-// Logout
+// Logout (method POST)
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
 /*
-|--------------------------------------------------------------------------
-| Campaign Creator Registration
-|--------------------------------------------------------------------------
+|---------------------------------------------------------------------------
+| Campaign Creator Registration (Public)
+|---------------------------------------------------------------------------
 */
 Route::get('/register/campaign-creator', [CampaignCreatorRegisterController::class, 'showRegistrationForm'])
     ->name('campaign.creator.register.form');
@@ -67,50 +86,59 @@ Route::post('/register/campaign-creator', [CampaignCreatorRegisterController::cl
     ->name('campaign.creator.register');
 
 /*
-|--------------------------------------------------------------------------
-| Email Verification Routes
-|--------------------------------------------------------------------------
+|---------------------------------------------------------------------------
+| OTP Verification Routes (WhatsApp)
+|---------------------------------------------------------------------------
+| These routes require the user to be authenticated (we store user session after
+| register, then user sees the OTP form). OtpController handles show, verify, resend.
 */
-Route::middleware(['auth'])->group(function () {
-    Route::get('/email/verify', [VerificationController::class, 'notice'])
-        ->name('verification.notice');
-
-    Route::post('/email/verification-notification', [VerificationController::class, 'resend'])
-        ->middleware('throttle:6,1')
-        ->name('verification.send');
+Route::middleware('auth')->group(function () {
+    Route::get('/otp/verify', [OtpController::class, 'showVerifyForm'])->name('verify.otp.form');
+    Route::post('/otp/verify', [OtpController::class, 'verifyOtp'])->name('verify.otp');
+    Route::post('/otp/resend', [OtpController::class, 'resendOtp'])->name('resend.otp');
 });
 
+/*
+|---------------------------------------------------------------------------
+| Email Verification Routes (Optional)
+|---------------------------------------------------------------------------
+*/
+Route::middleware(['auth'])->group(function () {
+    Route::get('/email/verify', [VerificationController::class, 'notice'])->name('verification.notice');
+    Route::post('/email/verification-notification', [VerificationController::class, 'resend'])
+        ->middleware('throttle:6,1')->name('verification.send');
+});
 Route::get('/email/verify/{id}/{hash}', [VerificationController::class, 'verify'])
-    ->middleware(['auth', 'signed', 'throttle:6,1'])
-    ->name('verification.verify');
+    ->middleware(['auth', 'signed', 'throttle:6,1'])->name('verification.verify');
 
 /*
-|--------------------------------------------------------------------------
+|---------------------------------------------------------------------------
 | Creator Dashboard
-|--------------------------------------------------------------------------
+|---------------------------------------------------------------------------
+| Protect creator/dashboard with custom otp.verified middleware (ensure OTP done)
 */
 Route::get('/creator/dashboard', [CreatorDashboardController::class, 'index'])
     ->name('creator.dashboard')
-    ->middleware(['auth', 'verified']);
+    ->middleware(['auth', 'otp.verified']);
 
 /*
-|--------------------------------------------------------------------------
+|---------------------------------------------------------------------------
 | Dashboard Redirect
-|--------------------------------------------------------------------------
+|---------------------------------------------------------------------------
 */
 Route::get('/dashboard', function () {
     $user = auth()->user();
-    return $user->role === 'admin'
+    return $user && $user->role === 'admin'
         ? redirect()->route('admin.dashboard')
         : redirect()->route('home');
-})->middleware(['auth', 'verified'])->name('dashboard');
+})->middleware(['auth', 'otp.verified'])->name('dashboard');
 
 /*
-|--------------------------------------------------------------------------
+|---------------------------------------------------------------------------
 | Profile Routes (User)
-|--------------------------------------------------------------------------
+|---------------------------------------------------------------------------
 */
-Route::middleware(['auth', 'verified'])->group(function () {
+Route::middleware(['auth', 'otp.verified'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
@@ -118,11 +146,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
 });
 
 /*
-|--------------------------------------------------------------------------
+|---------------------------------------------------------------------------
 | User Campaign Routes
-|--------------------------------------------------------------------------
+|---------------------------------------------------------------------------
 */
-Route::middleware(['auth', 'role.check:user,campaign_creator', 'verified'])
+Route::middleware(['auth', 'role.check:user,campaign_creator', 'otp.verified'])
     ->prefix('user')
     ->name('user.')
     ->group(function () {
@@ -138,12 +166,12 @@ Route::middleware(['auth', 'role.check:user,campaign_creator', 'verified'])
     });
 
 /*
-|--------------------------------------------------------------------------
+|---------------------------------------------------------------------------
 | Admin Routes
-|--------------------------------------------------------------------------
+|---------------------------------------------------------------------------
 */
 Route::prefix('admin')
-    ->middleware(['auth', 'role.check:admin'])
+    ->middleware(['auth', 'role.check:admin', 'otp.verified'])
     ->name('admin.')
     ->group(function () {
         Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
@@ -202,9 +230,9 @@ Route::prefix('admin')
     });
 
 /*
-|--------------------------------------------------------------------------
+|---------------------------------------------------------------------------
 | Donation Public Routes
-|--------------------------------------------------------------------------
+|---------------------------------------------------------------------------
 */
 Route::prefix('donation')->name('donation.')->group(function () {
     Route::get('/', [DonationController::class, 'index'])->name('index');
@@ -214,7 +242,7 @@ Route::prefix('donation')->name('donation.')->group(function () {
     Route::get('/success/{donation}', [DonationController::class, 'success'])->name('success');
     Route::get('/status/{donation}', [DonationController::class, 'checkStatus'])->name('status');
 
-    Route::middleware(['auth', 'role.check:user,campaign_creator'])->group(function () {
+    Route::middleware(['auth', 'role.check:user,campaign_creator', 'otp.verified'])->group(function () {
         Route::get('/history', [DonationController::class, 'myDonations'])->name('history');
         Route::get('/pending', [DonationController::class, 'pending'])->name('pending');
         Route::get('/{id}/edit', [DonationController::class, 'edit'])->name('edit');
@@ -223,16 +251,16 @@ Route::prefix('donation')->name('donation.')->group(function () {
 });
 
 /*
-|--------------------------------------------------------------------------
+|---------------------------------------------------------------------------
 | Midtrans Callback
-|--------------------------------------------------------------------------
+|---------------------------------------------------------------------------
 */
 Route::post('/midtrans/callback', [MidtransController::class, 'handleCallback'])->name('midtrans.callback');
 
 /*
-|--------------------------------------------------------------------------
+|---------------------------------------------------------------------------
 | Support Pages
-|--------------------------------------------------------------------------
+|---------------------------------------------------------------------------
 */
 Route::get('/faq', [SupportController::class, 'faq'])->name('faq');
 Route::get('/cara-berdonasi', [SupportController::class, 'donationGuide'])->name('donation.guide');
