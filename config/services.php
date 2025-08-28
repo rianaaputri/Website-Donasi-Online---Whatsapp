@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'japati' => [
+        'url' => env('JAPATI_URL'),
+        'token' => env('JAPATI_TOKEN'),
+        'gateway' => env('JAPATI_GATEWAY'),
+    ],
+
 ];
