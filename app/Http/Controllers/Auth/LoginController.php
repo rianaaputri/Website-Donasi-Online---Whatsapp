@@ -8,12 +8,13 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use App\Providers\RouteServiceProvider;
 use App\Models\User;
+use Illuminate\Support\Facades\Hash;
 use Exception;
 
 class LoginController extends Controller
 {
     /**
-     * ✅ Tampilkan halaman login
+     * Tampilkan halaman login
      */
     public function showLoginForm()
     {
@@ -27,7 +28,7 @@ class LoginController extends Controller
     }
 
     /**
-     * ✅ Proses login user
+     * Proses login user
      */
     public function login(Request $request)
     {
@@ -39,37 +40,37 @@ class LoginController extends Controller
                 'password' => ['required'],
             ]);
 
+            // Coba autentikasi
             if (Auth::attempt($credentials, $request->filled('remember'))) {
+
+                // Regenerasi session demi keamanan
+                $request->session()->regenerate();
+
                 $user = Auth::user();
                 Log::info("Login berhasil", ['user_id' => $user->id, 'email' => $user->email]);
 
-                // 🔒 Cek apakah email sudah diverifikasi
-                if (method_exists($user, 'hasVerifiedEmail') && ! $user->hasVerifiedEmail()) {
-                    Log::warning("User mencoba login tanpa verifikasi email", ['user_id' => $user->id]);
-
-                    Auth::logout();
-                    $request->session()->invalidate();
-                    $request->session()->regenerateToken();
-
-                    // 🚨 ALERT + LINK ke verifikasi
-                    return redirect()->route('login')->with([
-                        'warning' => 'Akun Anda belum diverifikasi. 
-                            <a href="'.route('verification.notice').'" class="underline text-blue-600">
-                                Klik di sini untuk verifikasi email
-                            </a>.'
-                    ]);
+                // 1) Jika sistem menggunakan OTP (kolom is_verified) -> cek OTP
+                if (isset($user->is_verified) && $user->is_verified === false) {
+                    // Tetap biarkan login agar user bisa lihat form OTP/resend.
+                    return redirect()->route('verify.otp.form')
+                        ->with('warning', 'Akun Anda belum diverifikasi. Kode OTP sudah dikirim ke WhatsApp. Silakan masukkan kode OTP.');
                 }
 
-                // 🔒 Regenerasi session untuk keamanan
-                $request->session()->regenerate();
+                // 2) Jika tidak menggunakan OTP, fallback ke email verification bila tersedia
+                if (method_exists($user, 'hasVerifiedEmail') && ! $user->hasVerifiedEmail()) {
+                    return redirect()->route('verification.notice')
+                        ->with('warning', 'Akun Anda belum diverifikasi melalui email. Silakan cek email untuk link verifikasi.');
+                }
 
-                // 🔀 Redirect sesuai role
-                return $user->role === 'admin'
-                    ? redirect()->intended(route('admin.dashboard'))->with('success', 'Selamat datang Admin!')
-                    : redirect()->intended(RouteServiceProvider::HOME)->with('success', 'Login berhasil. Selamat datang!');
+                // 3) Semua oke -> redirect sesuai role
+                if ($user->role === 'admin') {
+                    return redirect()->intended(route('admin.dashboard'))->with('success', 'Selamat datang Admin!');
+                }
+
+                return redirect()->intended(RouteServiceProvider::HOME)->with('success', 'Login berhasil. Selamat datang!');
             }
 
-            // ⚠️ Jika login gagal → cek user
+            // Jika gagal autentikasi -> cari user berdasarkan email untuk pesan yang lebih informatif
             $user = User::where('email', $request->email)->first();
 
             if (! $user) {
@@ -79,9 +80,18 @@ class LoginController extends Controller
                 ])->withInput();
             }
 
-            Log::warning("Login gagal: password salah", ['email' => $request->email]);
+            // Jika user ditemukan, cek apakah password salah
+            if (! Hash::check($request->password, $user->password)) {
+                Log::warning("Login gagal: password salah", ['email' => $request->email, 'user_id' => $user->id]);
+                return back()->withErrors([
+                    'password' => 'Password yang Anda masukkan salah.',
+                ])->withInput();
+            }
+
+            // Fallback umum
+            Log::warning("Login gagal: alasan tidak diketahui", ['email' => $request->email]);
             return back()->withErrors([
-                'password' => 'Password yang Anda masukkan salah.',
+                'email' => 'Gagal login. Silakan coba lagi.',
             ])->withInput();
 
         } catch (Exception $e) {
@@ -91,7 +101,7 @@ class LoginController extends Controller
     }
 
     /**
-     * ✅ Proses logout user
+     * Proses logout user
      */
     public function logout(Request $request)
     {

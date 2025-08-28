@@ -7,12 +7,12 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Auth\Events\Registered;
+use App\Services\WhatsappService;
 
 class UserController extends Controller
 {
     /**
-     * Tampilkan halaman registrasi user.
+     * ✅ Tampilkan halaman registrasi user.
      */
     public function showRegister()
     {
@@ -20,9 +20,9 @@ class UserController extends Controller
     }
 
     /**
-     * Proses registrasi user baru.
+     * ✅ Proses registrasi user baru (OTP WhatsApp).
      */
-    public function register(Request $request)
+    public function register(Request $request, WhatsappService $wa)
     {
         $validator = Validator::make($request->all(), [
             'name'     => 'required|string|min:2|max:255',
@@ -30,39 +30,53 @@ class UserController extends Controller
                 'required', 'email', 'unique:users,email',
                 'regex:/^.+@gmail\.com$/i'
             ],
+            'phone'    => 'required|string|min:10|max:15|unique:users,phone',
             'password' => 'required|string|min:6|confirmed',
         ], [
-            'name.required'     => 'Nama wajib diisi ya!',
-            'name.min'          => 'Nama minimal 2 karakter ya!',
-            'email.required'    => 'Email wajib diisi ya!',
-            'email.email'       => 'Format email tidak valid!',
-            'email.unique'      => 'Email ini sudah terdaftar, coba email lain ya!',
-            'email.regex'       => 'Email harus menggunakan @gmail.com ya!',
-            'password.required' => 'Password wajib diisi ya!',
-            'password.min'      => 'Password minimal 6 karakter ya!',
-            'password.confirmed'=> 'Konfirmasi password tidak cocok!',
+            'name.required'      => 'Nama wajib diisi ya!',
+            'name.min'           => 'Nama minimal 2 karakter ya!',
+            'email.required'     => 'Email wajib diisi ya!',
+            'email.email'        => 'Format email tidak valid!',
+            'email.unique'       => 'Email ini sudah terdaftar, coba email lain ya!',
+            'email.regex'        => 'Email harus menggunakan @gmail.com ya!',
+            'phone.required'     => 'Nomor WhatsApp wajib diisi!',
+            'phone.unique'       => 'Nomor WhatsApp ini sudah digunakan!',
+            'password.required'  => 'Password wajib diisi ya!',
+            'password.min'       => 'Password minimal 6 karakter ya!',
+            'password.confirmed' => 'Konfirmasi password tidak cocok!',
         ]);
 
         if ($validator->fails()) {
             return back()->withErrors($validator)->withInput();
         }
 
+        // ✅ Generate OTP (6 digit)
+        $otp = rand(100000, 999999);
+
         $user = User::create([
-            'name'     => $request->name,
-            'email'    => $request->email,
-            'password' => Hash::make($request->password),
-            'role'     => 'user',
+            'name'           => $request->name,
+            'email'          => $request->email,
+            'phone'          => $request->phone,
+            'password'       => Hash::make($request->password),
+            'role'           => 'user',
+            'is_active'      => 1,
+            'otp'            => $otp,
+            'otp_expires_at' => now()->addMinutes(5),
+            'is_verified'    => false,
         ]);
 
-        event(new Registered($user)); // Kirim email verifikasi
-        Auth::login($user); // Auto-login setelah registrasi
+        // ✅ Kirim OTP via WhatsApp
+        $wa->sendMessage($user->phone, "Halo {$user->name}, kode OTP Anda adalah *{$otp}*. Berlaku 5 menit. Jangan bagikan ke siapa pun.");
 
-        return redirect()->route('verification.notice')
-            ->with('success', 'Registrasi berhasil! Silakan cek email untuk verifikasi 📧');
+        // ✅ Auto login sementara (belum verified)
+        Auth::login($user);
+
+        return redirect()->route('verify.otp.form')
+            ->with('success', 'Registrasi berhasil! Kode OTP sudah dikirim ke WhatsApp Anda.');
     }
 
     /**
-     * Tampilkan halaman login.
+     * ✅ Tampilkan halaman login.
      */
     public function showLogin()
     {
@@ -70,7 +84,7 @@ class UserController extends Controller
     }
 
     /**
-     * Proses login user.
+     * ✅ Proses login user.
      */
     public function login(Request $request)
     {
@@ -84,21 +98,21 @@ class UserController extends Controller
         if (Auth::guard('web')->attempt($credentials, $request->filled('remember'))) {
             $user = Auth::guard('web')->user();
 
-            if (!$user->hasVerifiedEmail()) {
-                // Perbaikan: Ganti pesan dan pastikan logout tidak terjadi jika tujuannya redirect ke notice
-                return redirect()->route('verification.notice')
-                    ->with('warning', 'Silakan verifikasi email dulu ya!');
+            // 🚨 Kalau OTP belum diverifikasi
+            if (!$user->is_verified) {
+                return redirect()->route('verify.otp.form')
+                    ->with('warning', 'Akun Anda belum diverifikasi. Silakan masukkan kode OTP yang dikirim ke WhatsApp.');
             }
 
             $request->session()->regenerate();
-            return redirect()->intended('/');
+            return redirect()->intended('/dashboard');
         }
 
         return back()->with('error', 'Email atau password salah!')->withInput();
     }
 
     /**
-     * Proses logout user.
+     * ✅ Proses logout user.
      */
     public function logout(Request $request)
     {
