@@ -21,7 +21,22 @@ class RegisteredUserController extends Controller
     {
         return view('auth.register');
     }
+ private function kirimOtp($phone, $nama)
+{
+    $otp = rand(100000, 999999);
 
+    // Simpan ke DB
+    Otp::create([
+        'user_id'   => Auth::id(),
+        'phone'     => $phone,
+        'code'      => $otp,
+        'expired_at'=> Carbon::now()->addMinutes(1),
+    ]);
+
+    // Kirim WA
+    $pesan = "Kode OTP untuk verifikasi nomor WA $nama adalah: $otp. Berlaku 1 menit.";
+    kirimWa($phone, $pesan);
+}
     /**
      * Handle an incoming registration request.
      *
@@ -29,26 +44,83 @@ class RegisteredUserController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
-        $request->validate([
+        $validate = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:' . User::class],
+            'phone' => ['required', 'string', 'min:10', 'unique:' . User::class],
+            'role' => ['required', 'string', 'in:admin,user,campaign_craetor'],
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
         ]);
 
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-        ]);
+        $dataToStore=[
+            'name'=>$validate['name'],
+            'role'=>$validate['role'],
+            'phone'=>$validate['phone'],
+            'password'=>$validate['password']
+        ];
+        session()->put('pending_register', $dataToStore);
+        $this->kirimOtp($validate['phone'], $validate['name']);
+        return redirect()->route('otp.form')->with('sukses', 'Kode OTP telah dikirim ke WhatsApp');
 
-        // Trigger event untuk kirim email verifikasi
-        event(new Registered($user));
-
-        // Login user sementara
-        Auth::login($user);
+       
 
         // Redirect ke halaman verifikasi email dengan alert
-        return redirect()->route('verification.notice')
-            ->with('status', 'Registrasi berhasil! Silakan cek email Anda untuk verifikasi sebelum login.');
+      
     }
+    public function formOtp(): View
+    {
+        return view('auth.otp');
+    }
+    public function resendOtp()
+{
+    $data = session('pending_register');
+    if (!$data) {
+        return redirect()->route('register')->with('gagal', 'Session habis, silakan daftar ulang.');
+    }
+
+    $this->kirimOtp($data['phone'], $data['name']);
+    return back()->with('sukses', 'Kode OTP baru sudah dikirim ke WhatsApp.');
+}
+
+
+public function submitOtp(Request $request)
+{
+    $request->validate([
+        'otp' => 'required|digits:6',
+    ]);
+
+    $data = session('pending_register');
+    if (!$data) {
+        return redirect()->route('register')->with('gagal', 'Session habis, silakan daftar ulang.');
+    }
+
+    // Cari OTP di DB
+    $otpRecord = \App\Models\Otp::where('phone', $data['phone'])
+        ->where('code', $request->otp)
+        ->where('expired_at', '>', now())
+        ->latest()
+        ->first();
+
+    if (!$otpRecord) {
+        return back()->with('gagal', 'Kode OTP salah atau sudah kedaluwarsa.');
+    }
+
+    // OTP valid → hapus biar ga dipakai lagi
+    $otpRecord->delete();
+
+    // Lanjut simpan user
+    $user = new User();
+    $user->name = $data['name'];
+    $user->phone = $data['phone'];
+    $user->role = $data['role'];
+    $user->password = bcrypt($data['password']);
+
+    $user->save();
+
+  
+
+    session()->forget('pending_register');
+    auth()->login($user);
+
+    return redirect()->route('home.index')->with('sukses', 'Registrasi berhasil!');
+}
 }

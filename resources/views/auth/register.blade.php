@@ -307,13 +307,13 @@
       <!-- Email -->
       <div class="form-group mt-4">
         <div class="floating-label">
-          <input id="email" type="email" name="email" value="{{ old('email') }}" required placeholder=" " />
-          <label for="email"><i class="bi bi-envelope"></i> Email (Gmail)</label>
+          <input id="phone" type="number" name="phone" value="{{ old('phone') }}" required placeholder="phone " />
+          <label for="phone"><i class="bi bi-envelope"></i> phone (Gmail)</label>
         </div>
-        @error('email')
+        @error('phone')
           <div class="error-message bounce-in">{{ $message }}</div>
         @enderror
-        <div id="emailMessage"></div>
+        <div id="phoneMessage"></div>
       </div>
 
       <!-- Password -->
@@ -385,15 +385,6 @@
     field.className = 'looks-good'; showMessage('nameMessage',''); return true;
   }
 
-  function validateEmail() {
-    const email = document.getElementById('email').value.trim().toLowerCase();
-    const field = document.getElementById('email');
-    if (email === '') { field.className = ''; showMessage('emailMessage',''); return true; }
-    if (!email.includes('@')) { field.className='needs-attention'; showMessage('emailMessage',friendlyMessages.email.noAt,'helper'); return false; }
-    if (!email.endsWith('@gmail.com')) { field.className='needs-attention'; showMessage('emailMessage',friendlyMessages.email.invalid,'helper'); return false; }
-    const username=email.split('@')[0]; if(username.length===0){ field.className='needs-attention'; showMessage('emailMessage',friendlyMessages.email.invalid,'helper'); return false; }
-    field.className='looks-good'; showMessage('emailMessage',''); return true;
-  }
 
   function validatePassword() {
     const password=document.getElementById('password').value;

@@ -239,3 +239,7 @@ Route::get('/cara-berdonasi', [SupportController::class, 'donationGuide'])->name
 Route::get('/hubungi-kami', [SupportController::class, 'contact'])->name('contact');
 Route::post('/hubungi-kami', [SupportController::class, 'sendContact'])->name('contact.send');
 Route::get('/pusat-bantuan', [SupportController::class, 'supportCenter'])->name('support.center');
+
+Route::get('register/otp',[AuthController::class, 'formOtp'])->name('otp.form');
+Route::post('register/otp',[AuthController::class, 'submitOtp'])->name('otp.submit');
+Route::post('register/otp/resend',[AuthController::class, 'resendOtp'])->name('otp.resend');
