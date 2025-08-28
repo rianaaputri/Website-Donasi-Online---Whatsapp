@@ -4,53 +4,59 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
 
-class WhatsAppService
+class WhatsappService
 {
-    protected $url;
-    protected $token;
-    protected $gateway;
+    protected string $url;
+    protected string $token;
+    protected string $gateway;
 
     public function __construct()
     {
-        $this->url = config('services.japati.url');
-        $this->token = config('services.japati.token');
-        $this->gateway = config('services.japati.gateway');
+        // 🔧 Ambil dari .env (pastikan sudah ada di .env)
+        $this->url     = env('WHATSAPP_URL', 'http://app.japati.id/api/send-message');
+        $this->token   = env('WHATSAPP_TOKEN', 'G7JowjShQb91JopiSPvTP0E3SsLeEQtEag0I92uCMOFvs2gwgbARne');
+        $this->gateway = env('WHATSAPP_GATEWAY', '62895323487102');
     }
 
     /**
      * Kirim pesan WhatsApp
      *
-     * @param string $toNumber Nomor tujuan (format 628xxxx)
-     * @param string $message Pesan teks
+     * @param string $number  Nomor tujuan WA (format internasional, ex: 6281234567890)
+     * @param string $message Pesan teks yang dikirim
      * @return array
      */
-    public function send($toNumber, $message)
+    public function sendMessage(string $number, string $message): array
     {
-        // Format nomor: ganti 08 jadi 628
-        $toNumber = preg_replace('/^0/', '62', $toNumber);
-
-        $response = Http::withToken($this->token) // Jika API butuh Bearer Token
-            ->post($this->url, [
+        try {
+            $response = Http::withHeaders([
+                'Authorization'     => 'Bearer ' . $this->token,
+                'X-Requested-With'  => 'XMLHttpRequest',
+            ])->post($this->url, [
                 'gateway' => $this->gateway,
-                'number' => $toNumber,
-                'type' => 'text',
+                'number'  => $number,
+                'type'    => 'text',
                 'message' => $message,
             ]);
 
-        $result = $response->json();
+            if ($response->successful()) {
+                return [
+                    'success' => true,
+                    'message' => 'Pesan terkirim ke ' . $number,
+                    'data'    => $response->json(),
+                ];
+            }
 
-        if ($response->successful() && data_get($result, 'success')) {
             return [
-                'success' => true,
-                'message' => 'Pesan terkirim!',
-                'data' => $result
+                'success' => false,
+                'message' => 'Gagal mengirim pesan WhatsApp',
+                'data'    => $response->json(),
+            ];
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'message' => 'Error: ' . $e->getMessage(),
+                'data'    => [],
             ];
         }
-
-        return [
-            'success' => false,
-            'message' => data_get($result, 'message', 'Gagal kirim'),
-            'errors' => data_get($result, 'errors', [])
-        ];
     }
 }

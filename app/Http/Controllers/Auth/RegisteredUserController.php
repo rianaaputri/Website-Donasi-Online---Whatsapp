@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use Illuminate\Auth\Events\Registered;
+use App\Services\WhatsappService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -15,7 +15,7 @@ use Illuminate\View\View;
 class RegisteredUserController extends Controller
 {
     /**
-     * Tampilkan form registrasi
+     * ✅ Tampilkan form registrasi
      */
     public function create(): View
     {
@@ -23,34 +23,54 @@ class RegisteredUserController extends Controller
     }
 
     /**
-     * Proses registrasi user baru
+     * ✅ Proses registrasi user baru + kirim OTP via WhatsApp
      */
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, WhatsappService $wa): RedirectResponse
     {
         $request->validate([
             'name'     => ['required', 'string', 'max:255'],
-            'email'    => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:users,email'],
+            // Email opsional
+            'email'    => ['nullable', 'string', 'lowercase', 'email', 'max:255', 'unique:users,email'],
+            'phone'    => ['required', 'string', 'regex:/^62[0-9]{9,13}$/', 'unique:users,phone'],
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
+        ], [
+            'phone.regex' => 'Nomor WhatsApp harus diawali dengan 62 dan hanya angka.'
         ]);
 
-        // ✅ Buat user baru
+        // ✅ Generate OTP (6 digit)
+        $otp = random_int(100000, 999999);
+
+        // ✅ Buat user baru (belum verified)
         $user = User::create([
-            'name'      => $request->name,
-            'email'     => $request->email,
-            'password'  => Hash::make($request->password),
-            'role'      => 'user', // role default
-            'is_active' => 1,      // default aktif
+            'name'           => $request->name,
+            'email'          => $request->email, // bisa null
+            'phone'          => $request->phone,
+            'password'       => Hash::make($request->password),
+            'role'           => 'user',
+            'is_active'      => true,
+            'otp'            => $otp,
+            'otp_expires_at' => now()->addMinutes(5),
+            'is_verified'    => false,
         ]);
 
-        // ✅ Login otomatis supaya bisa akses halaman verifikasi
+        // ✅ Kirim OTP via WhatsApp Japati
+        try {
+            $wa->sendMessage(
+                $user->phone,
+                "Halo *{$user->name}*,\n\nKode OTP Anda adalah *{$otp}*.\n\n⚠️ Berlaku 5 menit. Jangan bagikan ke siapa pun."
+            );
+        } catch (\Exception $e) {
+            // kalau gagal kirim OTP, hapus user agar tidak ada akun 'nyangkut'
+            $user->delete();
+
+            return redirect()->route('register')
+                ->with('error', '❌ Gagal mengirim OTP ke WhatsApp. Silakan coba lagi.');
+        }
+
+        // ✅ Simpan user login (sementara, status belum verified)
         Auth::login($user);
 
-        // ✅ Trigger event Registered → otomatis kirim email verifikasi
-        event(new Registered($user));
-
-        // ✅ Redirect ke halaman verifikasi
-        return redirect()->route('verification.notice')
-            ->with('success', '✅ Registrasi berhasil! Silakan cek email Anda untuk verifikasi akun. 
-                                Jika email tidak masuk, klik tombol kirim ulang.');
+        return redirect()->route('verify.otp.form')
+            ->with('success', '✅ Registrasi berhasil! Kode OTP telah dikirim ke WhatsApp Anda.');
     }
 }
