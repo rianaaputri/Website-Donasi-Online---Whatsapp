@@ -1,68 +1,59 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-
-/*
-|---------------------------------------------------------------------------
-| Controller imports
-|---------------------------------------------------------------------------
-|
-| Pastikan semua controller di bawah benar-benar ada di app/Http/Controllers.
-| Jika beberapa controller berada di subfolder, sesuaikan namespace import.
-|
-*/
 use App\Http\Controllers\{
     HomeController,
     AdminController,
     MidtransController,
+    UserController,
     ProfileController,
     DonationController,
     SupportController,
+    Auth\LoginController,
+    Auth\PasswordResetLinkController,
+    Auth\NewPasswordController,
     AdminDashboardController,
     CampaignController
 };
-
-use App\Http\Controllers\Auth\{
-    LoginController,
-    RegisteredUserController,
-    PasswordResetLinkController,
-    NewPasswordController,
-    VerificationController, // optional
-    OtpController,          // OTP controller (verify & resend)
-    CampaignCreatorRegisterController
-};
-
-use App\Http\Controllers\Admin\{
-    DonationController as AdminDonationController,
-    CampaignController as AdminCampaignController,
-    UserController as AdminUserController
-};
-
+use App\Http\Controllers\Auth\PasswordController;
+use App\Http\Controllers\Admin\DonationController as AdminDonationController;
+use App\Http\Controllers\Admin\CampaignController as AdminCampaignController;
+use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\User\CampaignController as UserCampaignController;
-use App\Http\Controllers\Creator\CreatorDashboardController;
 
+use App\Http\Controllers\Auth\CampaignCreatorRegisterController;
+use App\Http\Controllers\Creator\CreatorDashboardController;
+use App\Http\Controllers\Auth\RegisterController;
+use App\Http\Controllers\Auth\RegisteredUserController;
+use App\Http\Controllers\AuthController;
 /*
-|---------------------------------------------------------------------------
+|--------------------------------------------------------------------------
 | Public Routes
-|---------------------------------------------------------------------------
+|--------------------------------------------------------------------------
 */
 Route::get('/', [HomeController::class, 'index'])->name('home');
 Route::get('/campaign/{id}', [HomeController::class, 'showCampaign'])->name('campaign.show');
 Route::get('/campaign-detail/{id}', [CampaignController::class, 'detail'])->name('campaign.detail');
 
 /*
-|---------------------------------------------------------------------------
+|--------------------------------------------------------------------------
 | Auth (Guest Only)
-|---------------------------------------------------------------------------
+|--------------------------------------------------------------------------
 */
 Route::middleware('guest')->group(function () {
-    // Login
     Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
     Route::post('/login', [LoginController::class, 'login']);
 
-    // Register (gunakan RegisteredUserController yang sudah kita perbaiki)
-    Route::get('/register', [RegisteredUserController::class, 'create'])->name('register');
-    Route::post('/register', [RegisteredUserController::class, 'store']);
+Route::get('/register', [RegisterController::class, 'register'])->name('register');
+Route::post('/register/user', [RegisterController::class, 'submitRegister'])->name('register.submit');
+
+Route::get('register/otp',[RegisterController::class, 'formOtp'])->name('otp.form');
+Route::post('register/otp',[RegisterController::class, 'submitOtp'])->name('otp.submit');
+Route::post('register/otp/resend',[RegisterController::class, 'resendOtp'])->name('otp.resend');
+
+Route::get('/profile/otp', [ProfilememberController::class, 'formOtp'])->name('profile.otp');
+Route::post('/profile/otp', [ProfilememberController::class, 'submitOtp'])->name('profile.submit.otp');
+Route::post('/profile/otp/resend', [ProfilememberController::class, 'resendOtp'])->name('profile.resend.otp');
 
     // Password Reset
     Route::get('/forgot-password', [PasswordResetLinkController::class, 'create'])->name('password.request');
@@ -72,13 +63,13 @@ Route::middleware('guest')->group(function () {
     Route::post('/reset-password', [NewPasswordController::class, 'store'])->name('password.update');
 });
 
-// Logout (method POST)
+// Logout
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
 /*
-|---------------------------------------------------------------------------
-| Campaign Creator Registration (Public)
-|---------------------------------------------------------------------------
+|--------------------------------------------------------------------------
+| Campaign Creator Registration
+|--------------------------------------------------------------------------
 */
 Route::get('/register/campaign-creator', [CampaignCreatorRegisterController::class, 'showRegistrationForm'])
     ->name('campaign.creator.register.form');
@@ -86,71 +77,53 @@ Route::post('/register/campaign-creator', [CampaignCreatorRegisterController::cl
     ->name('campaign.creator.register');
 
 /*
-|---------------------------------------------------------------------------
-| OTP Verification Routes (WhatsApp)
-|---------------------------------------------------------------------------
-| These routes require the user to be authenticated (we store user session after
-| register, then user sees the OTP form). OtpController handles show, verify, resend.
+|--------------------------------------------------------------------------
+| Email Verification Routes
+|--------------------------------------------------------------------------
 */
-Route::middleware('auth')->group(function () {
-    Route::get('/otp/verify', [OtpController::class, 'showVerifyForm'])->name('verify.otp.form');
-    Route::post('/otp/verify', [OtpController::class, 'verifyOtp'])->name('verify.otp');
-    Route::post('/otp/resend', [OtpController::class, 'resendOtp'])->name('resend.otp');
-});
+
+
+
 
 /*
-|---------------------------------------------------------------------------
-| Email Verification Routes (Optional)
-|---------------------------------------------------------------------------
-*/
-Route::middleware(['auth'])->group(function () {
-    Route::get('/email/verify', [VerificationController::class, 'notice'])->name('verification.notice');
-    Route::post('/email/verification-notification', [VerificationController::class, 'resend'])
-        ->middleware('throttle:6,1')->name('verification.send');
-});
-Route::get('/email/verify/{id}/{hash}', [VerificationController::class, 'verify'])
-    ->middleware(['auth', 'signed', 'throttle:6,1'])->name('verification.verify');
-
-/*
-|---------------------------------------------------------------------------
+|--------------------------------------------------------------------------
 | Creator Dashboard
-|---------------------------------------------------------------------------
-| Protect creator/dashboard with custom otp.verified middleware (ensure OTP done)
+|--------------------------------------------------------------------------
 */
 Route::get('/creator/dashboard', [CreatorDashboardController::class, 'index'])
     ->name('creator.dashboard')
-    ->middleware(['auth', 'otp.verified']);
+    ->middleware(['auth']);
 
 /*
-|---------------------------------------------------------------------------
+|--------------------------------------------------------------------------
 | Dashboard Redirect
-|---------------------------------------------------------------------------
+|--------------------------------------------------------------------------
 */
 Route::get('/dashboard', function () {
     $user = auth()->user();
-    return $user && $user->role === 'admin'
+    return $user->role === 'admin'
         ? redirect()->route('admin.dashboard')
         : redirect()->route('home');
-})->middleware(['auth', 'otp.verified'])->name('dashboard');
+})->middleware(['auth'])->name('dashboard');
 
 /*
-|---------------------------------------------------------------------------
+|--------------------------------------------------------------------------
 | Profile Routes (User)
-|---------------------------------------------------------------------------
+|--------------------------------------------------------------------------
 */
-Route::middleware(['auth', 'otp.verified'])->group(function () {
+
     Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     Route::post('/password/update', [PasswordController::class, 'update'])->name('profile.password.update');
-});
+
 
 /*
-|---------------------------------------------------------------------------
+|--------------------------------------------------------------------------
 | User Campaign Routes
-|---------------------------------------------------------------------------
+|--------------------------------------------------------------------------
 */
-Route::middleware(['auth', 'role.check:user,campaign_creator', 'otp.verified'])
+Route::middleware(['auth', 'role.check:user,campaign_creator', ])
     ->prefix('user')
     ->name('user.')
     ->group(function () {
@@ -166,12 +139,12 @@ Route::middleware(['auth', 'role.check:user,campaign_creator', 'otp.verified'])
     });
 
 /*
-|---------------------------------------------------------------------------
+|--------------------------------------------------------------------------
 | Admin Routes
-|---------------------------------------------------------------------------
+|--------------------------------------------------------------------------
 */
 Route::prefix('admin')
-    ->middleware(['auth', 'role.check:admin', 'otp.verified'])
+    ->middleware(['auth', 'role.check:admin'])
     ->name('admin.')
     ->group(function () {
         Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
@@ -181,7 +154,7 @@ Route::prefix('admin')
         Route::get('/list-admins', [AdminController::class, 'index'])->name('list-admins');
         Route::post('/update-role', [AdminController::class, 'updateRole'])->name('update-role');
         Route::post('/update-status', [AdminController::class, 'updateStatus'])->name('update-status');
-        Route::post('/verify-email', [AdminController::class, 'verifyEmail'])->name('verify-email');
+    
         Route::post('/show-user', [AdminController::class, 'showUser'])->name('show-user');
         Route::get('/show-user/{id}', [AdminController::class, 'showUserDetail'])->name('show-user-detail');
         Route::delete('/delete-admin/{id}', [AdminController::class, 'deleteAdmin'])->name('delete-admin');
@@ -197,7 +170,7 @@ Route::prefix('admin')
             Route::delete('/{user}', [AdminUserController::class, 'destroy'])->name('destroy');
 
             Route::patch('/{user}/status', [AdminUserController::class, 'updateStatus'])->name('update-status');
-            Route::patch('/{user}/verify-email', [AdminUserController::class, 'verifyEmail'])->name('verify-email');
+       
             Route::get('/{user}/campaigns', [AdminUserController::class, 'campaigns'])->name('campaigns');
             Route::get('/{user}/donations', [AdminUserController::class, 'donations'])->name('donations');
             Route::post('/bulk-action', [AdminUserController::class, 'bulkAction'])->name('bulk-action');
@@ -230,9 +203,9 @@ Route::prefix('admin')
     });
 
 /*
-|---------------------------------------------------------------------------
+|--------------------------------------------------------------------------
 | Donation Public Routes
-|---------------------------------------------------------------------------
+|--------------------------------------------------------------------------
 */
 Route::prefix('donation')->name('donation.')->group(function () {
     Route::get('/', [DonationController::class, 'index'])->name('index');
@@ -242,7 +215,7 @@ Route::prefix('donation')->name('donation.')->group(function () {
     Route::get('/success/{donation}', [DonationController::class, 'success'])->name('success');
     Route::get('/status/{donation}', [DonationController::class, 'checkStatus'])->name('status');
 
-    Route::middleware(['auth', 'role.check:user,campaign_creator', 'otp.verified'])->group(function () {
+    Route::middleware(['auth', 'role.check:user,campaign_creator'])->group(function () {
         Route::get('/history', [DonationController::class, 'myDonations'])->name('history');
         Route::get('/pending', [DonationController::class, 'pending'])->name('pending');
         Route::get('/{id}/edit', [DonationController::class, 'edit'])->name('edit');
@@ -251,19 +224,21 @@ Route::prefix('donation')->name('donation.')->group(function () {
 });
 
 /*
-|---------------------------------------------------------------------------
+|--------------------------------------------------------------------------
 | Midtrans Callback
-|---------------------------------------------------------------------------
+|--------------------------------------------------------------------------
 */
 Route::post('/midtrans/callback', [MidtransController::class, 'handleCallback'])->name('midtrans.callback');
 
 /*
-|---------------------------------------------------------------------------
+|--------------------------------------------------------------------------
 | Support Pages
-|---------------------------------------------------------------------------
+|--------------------------------------------------------------------------
 */
 Route::get('/faq', [SupportController::class, 'faq'])->name('faq');
 Route::get('/cara-berdonasi', [SupportController::class, 'donationGuide'])->name('donation.guide');
 Route::get('/hubungi-kami', [SupportController::class, 'contact'])->name('contact');
 Route::post('/hubungi-kami', [SupportController::class, 'sendContact'])->name('contact.send');
 Route::get('/pusat-bantuan', [SupportController::class, 'supportCenter'])->name('support.center');
+
+

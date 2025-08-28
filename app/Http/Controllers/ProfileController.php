@@ -65,10 +65,7 @@ public function edit(Request $request): View
         // Simpan ke database
         $user->save();
 
-        // Jika email berubah, kirim notifikasi verifikasi
-        if ($emailChanged) {
-            $user->sendEmailVerificationNotification();
-        }
+       
 
         // Ambil data baru yang disimpan
         $updatedData = $user->only(['name', 'email', 'phone', 'address', 'is_active', 'updated_at']);

@@ -4,9 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Models\Admin; 
 use App\Models\User;  
+use App\Models\Otp;  
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\View\View;
+use Illuminate\Validation\Rules\Password;
+
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Validation\ValidationException; // Pastikan ini diimport
 use Illuminate\Support\Facades\Log; // Pastikan ini diimport
@@ -93,41 +97,111 @@ class AuthController extends Controller
         return redirect('/'); 
     }
 
-    // --- Metode showRegister dan register admin Anda ---
-    // Jika Anda ingin admin dan user register dari tempat berbeda, biarkan metode ini di AuthController
-    // dan pastikan form register admin mengarah ke AuthController@register
-    public function showRegister()
+    public function create(): View
     {
-        return view('auth.admin-register'); // Contoh, sesuaikan dengan view register admin Anda
+        return view('auth.register');
+    }
+ private function kirimOtp($phone, $nama)
+{
+    $otp = rand(100000, 999999);
+
+    // Simpan ke DB
+    Otp::create([
+        'user_id'   => Auth::id(),
+        'phone'     => $phone,
+        'code'      => $otp,
+        'expired_at'=> Carbon::now()->addMinutes(1),
+    ]);
+
+    // Kirim WA
+    $pesan = "Kode OTP untuk verifikasi nomor WA $nama adalah: $otp. Berlaku 1 menit.";
+    kirimWa($phone, $pesan);
+}
+    /**
+     * Handle an incoming registration request.
+     *
+     * @throws \Illuminate\Validation\ValidationException
+     */
+    public function store(Request $request): RedirectResponse
+    {
+      $validate = $request->validate([
+    'name' => ['required', 'string', 'max:255'],
+    'phone' => ['required', 'string', 'min:10', 'unique:' . User::class],
+    'role' => ['required', 'string', 'in:admin,user,campaign_creator'],
+    'password' => ['required', 'confirmed', Password::defaults()],
+]);
+
+
+        $dataToStore=[
+            'name'=>$validate['name'],
+            'role'=>$validate['role'],
+            'phone'=>$validate['phone'],
+            'password'=>$validate['password']
+        ];
+        session()->put('pending_register', $dataToStore);
+        $this->kirimOtp($validate['phone'], $validate['name']);
+        return redirect()->route('otp.form')->with('sukses', 'Kode OTP telah dikirim ke WhatsApp');
+
+       
+
+        // Redirect ke halaman verifikasi email dengan alert
+      
+    }
+    public function formOtp(): View
+    {
+        return view('auth.otp');
+    }
+    public function resendOtp()
+{
+    $data = session('pending_register');
+    if (!$data) {
+        return redirect()->route('register')->with('gagal', 'Session habis, silakan daftar ulang.');
     }
 
-    public function register(Request $request)
-    {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:admins,email', 
-            'password' => 'required|min:6|confirmed',
-        ], [
-            'name.required' => 'Nama wajib diisi!',
-            'email.required' => 'Email wajib diisi!',
-            'email.unique' => 'Email sudah terdaftar!',
-            'password.required' => 'Password wajib diisi!',
-            'password.min' => 'Password minimal 6 karakter!',
-            'password.confirmed' => 'Konfirmasi password tidak cocok!',
-        ]);
+    $this->kirimOtp($data['phone'], $data['name']);
+    return back()->with('sukses', 'Kode OTP baru sudah dikirim ke WhatsApp.');
+}
 
-        $admin = Admin::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-        ]);
 
-        // Langsung login admin setelah register
-        Auth::guard('admin')->login($admin); 
-        event(new Registered($admin));
+public function submitOtp(Request $request)
+{
+    $request->validate([
+        'otp' => 'required|digits:6',
+    ]);
 
-        // Arahkan ke dashboard admin setelah register dan login
-        return redirect()->route('admin.dashboard')
-            ->with('success', 'Registrasi admin berhasil! Silakan verifikasi email Anda.');
+    $data = session('pending_register');
+    if (!$data) {
+        return redirect()->route('register')->with('gagal', 'Session habis, silakan daftar ulang.');
     }
+
+    // Cari OTP di DB
+    $otpRecord = \App\Models\Otp::where('phone', $data['phone'])
+        ->where('code', $request->otp)
+        ->where('expired_at', '>', now())
+        ->latest()
+        ->first();
+
+    if (!$otpRecord) {
+        return back()->with('gagal', 'Kode OTP salah atau sudah kedaluwarsa.');
+    }
+
+    // OTP valid → hapus biar ga dipakai lagi
+    $otpRecord->delete();
+
+    // Lanjut simpan user
+    $user = new User();
+    $user->name = $data['name'];
+    $user->phone = $data['phone'];
+    $user->role = $data['role'];
+    $user->password = bcrypt($data['password']);
+
+    $user->save();
+
+  
+
+    session()->forget('pending_register');
+    auth()->login($user);
+
+    return redirect()->route('home.index')->with('sukses', 'Registrasi berhasil!');
+}
 }

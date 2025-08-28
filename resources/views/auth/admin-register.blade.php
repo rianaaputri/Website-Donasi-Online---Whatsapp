@@ -368,14 +368,15 @@
       </div>
 
       <!-- Email Field - validate gmail.com only -->
-      <div class="form-floating">
-        <input type="email" class="form-control" 
-               id="email" name="email" placeholder="Email" 
-               required autocomplete="email" onblur="validateEmail()" onkeyup="validateEmail()">
-        <label for="email">
-          <i class="bi bi-envelope me-2"></i>Alamat Email (Gmail)
-        </label>
-        <div id="emailMessage"></div>
+         <div class="form-group mt-4">
+        <div class="floating-label">
+          <input id="phone" type="number" name="phone" value="{{ old('phone') }}" required placeholder="phone " />
+          <label for="phone"><i class="bi bi-envelope"></i> phone</label>
+        </div>
+        @error('phone')
+          <div class="error-message bounce-in">{{ $message }}</div>
+        @enderror
+        <div id="phoneMessage"></div>
       </div>
 
       <!-- Password Field - no validation -->
