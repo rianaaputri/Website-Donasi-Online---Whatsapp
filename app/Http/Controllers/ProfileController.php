@@ -38,6 +38,36 @@ class ProfileController extends Controller
     }
 
     /**
+     * Konversi nomor HP lokal (08) ke internasional (62)
+     */
+    private function toInternational($phone)
+    {
+        $phone = preg_replace('/[^0-9]/', '', $phone);
+        if (substr($phone, 0, 2) === '08') {
+            return '628' . substr($phone, 2);
+        }
+        if (substr($phone, 0, 1) === '8') {
+            return '628' . substr($phone, 1);
+        }
+        if (substr($phone, 0, 3) === '628') {
+            return $phone;
+        }
+        return $phone;
+    }
+
+    /**
+     * Konversi nomor HP internasional (62) ke lokal (08) untuk ditampilkan
+     */
+    private function toLocal($phone)
+    {
+        $phone = preg_replace('/[^0-9]/', '', $phone);
+        if (substr($phone, 0, 3) === '628') {
+            return '08' . substr($phone, 3);
+        }
+        return $phone;
+    }
+
+    /**
      * Kirim OTP ke nomor WhatsApp.
      */
     private function kirimOtp($phone, $nama)
@@ -68,27 +98,29 @@ class ProfileController extends Controller
             'phone' => [
                 'required',
                 'string',
-                'regex:/^628[0-9]{8,13}$/',
+                'regex:/^(08|8|628)[0-9]{8,13}$/',
                 Rule::unique('users', 'phone')->ignore($user->id)
             ],
             'address' => 'required|string|max:255',
             'avatar' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
         ], [
-            'phone.regex' => 'Format nomor WhatsApp tidak valid. Gunakan format 628123456789.',
+            'phone.regex' => 'Format nomor WhatsApp tidak valid. Gunakan format 08123456789.',
             'phone.unique' => 'Nomor telepon ini sudah digunakan oleh akun lain.',
         ]);
 
+        // Konversi ke format internasional
+        $phoneInternational = $this->toInternational($validatedData['phone']);
+        $phoneChanged = $phoneInternational !== $user->phone;
+
         // Cek perubahan data
         $changes = [];
-        $phoneChanged = false;
 
         if ($validatedData['name'] !== $user->name) {
             $changes['name'] = $validatedData['name'];
         }
 
-        if ($validatedData['phone'] !== $user->phone) {
-            $changes['phone'] = $validatedData['phone'];
-            $phoneChanged = true;
+        if ($phoneChanged) {
+            $changes['phone'] = $phoneInternational;
         }
 
         if ($validatedData['address'] !== $user->address) {
@@ -131,7 +163,7 @@ class ProfileController extends Controller
         session(['pending_update' => [
             'step' => 'verify_old',
             'name' => $validatedData['name'],
-            'phone' => $validatedData['phone'],
+            'phone' => $phoneInternational,
             'avatar' => $avatarPath,
             'address' => $validatedData['address'],
         ]]);

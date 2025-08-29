@@ -442,7 +442,9 @@
                                         <div class="info-item">
                                             <div class="info-label">Nomor Telepon</div>
                                             <div class="view-mode">
-                                                <div class="info-value" id="phoneDisplayValue">{{ Auth::user()->phone ?? 'Belum diisi' }}</div>
+                                                <div class="info-value" id="phoneDisplayValue">
+                                                    {{ Auth::user()->formatted_phone }}
+                                                </div>
                                             </div>
                                             <div class="edit-mode d-none">
                                                 <input type="tel" class="form-control" name="phone" id="phoneInput" value="{{ Auth::user()->phone }}" placeholder="628123456789" required>
