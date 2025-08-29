@@ -47,9 +47,9 @@ Route::middleware('guest')->group(function () {
 Route::get('/register', [RegisterController::class, 'register'])->name('register');
 Route::post('/register/user', [RegisterController::class, 'submitRegister'])->name('register.submit');
 
-Route::get('register/otp',[RegisterController::class, 'formOtp'])->name('otp.form');
-Route::post('register/otp',[RegisterController::class, 'submitOtp'])->name('otp.submit');
-Route::post('register/otp/resend',[RegisterController::class, 'resendOtp'])->name('otp.resend');
+Route::get('register/otp',[RegisteredUserController::class, 'formOtp'])->name('otp.form');
+Route::post('register/otp',[RegisteredUserController::class, 'submitOtp'])->name('otp.submit');
+Route::post('register/otp/resend',[RegisteredUserController::class, 'resendOtp'])->name('otp.resend');
 
 Route::get('/profile/otp', [ProfilememberController::class, 'formOtp'])->name('profile.otp');
 Route::post('/profile/otp', [ProfilememberController::class, 'submitOtp'])->name('profile.submit.otp');

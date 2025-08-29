@@ -408,18 +408,19 @@
       </div>
 
       {{-- Phone Field --}}
-      <div class="form-floating">
-        <input type="number" class="form-control @error('phone') is-invalid @enderror" 
-               id="phone" name="phone" placeholder="phone" 
-               value="{{ old('phone') }}" required autocomplete="phone">
-        <label for="phone">
-          <i class="bi bi-envelope me-2"></i>phone 
-        </label>
-        @error('phone')
-          <div class="validation-message error">{{ $message }}</div>
-        @enderror
-        <div id="phoneValidation" class="validation-message" style="display: none;"></div>
-      </div>
+      <div class="form-floating mb-3">
+    <input type="tel" class="form-control @error('phone') is-invalid @enderror" 
+           id="phone" name="phone" placeholder="phone" 
+           value="{{ old('phone') }}" required autocomplete="tel">
+    <label for="phone">
+        <i class="bi bi-telephone me-2"></i> Phone
+    </label>
+    @error('phone')
+        <div class="validation-message error">{{ $message }}</div>
+    @enderror
+    <div id="phoneValidation" class="validation-message" style="display: none;"></div>
+</div>
+
 
       {{-- Password Field --}}
       <div class="form-floating password-wrapper">

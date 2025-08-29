@@ -185,7 +185,7 @@
                             <th>No</th>
                             <th>Campaign</th>
                             <th>Donatur</th>
-                            <th>Email</th>
+                            <th>Phone</th>
                             <th>Jumlah</th>
                             <th>Status</th>
                             <th>Tanggal</th>
@@ -209,11 +209,11 @@
                                     @endif
                                 </td>
                                 <td>
-                                    @if($donation->user)
-                                        {{ $donation->user->email }}
-                                    @else
-                                        {{ $donation->donor_email ?? '-' }}
-                                    @endif
+                                       @if($donation->user)
+                    {{ $donation->user->phone }}
+                @else
+                    {{ $donation->donor_phone ?? '-' }}
+                @endif
                                 </td>
                                 <td>
                                     <strong>Rp {{ number_format($donation->amount, 0, ',', '.') }}</strong>

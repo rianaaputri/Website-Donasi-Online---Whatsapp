@@ -17,7 +17,7 @@ class DonationController extends Controller
     {
         $this->midtrans = $midtrans;
 
-        // Proteksi hanya untuk route yang butuh login & verifikasi email
+        // Proteksi hanya untuk route yang butuh login & verifikasi phone
         $this->middleware(['auth', 'verified'])->only([
             'payment', 'success'
         ]);
@@ -113,7 +113,7 @@ class DonationController extends Controller
             'comment' => $request->comment,
             'is_anonymous' => $request->is_anonymous ?? false,
             'donor_name' => $user->name,
-            'donor_email' => $user->email,
+            'donor_phone' => $user->phone,
             'payment_status' => 'pending',
             'midtrans_order_id' => $orderId
         ]);
@@ -140,7 +140,7 @@ class DonationController extends Controller
             ],
             'customer_details' => [
                 'first_name' => $donation->donor_name,
-                'email' => $donation->donor_email
+                'phone' => $donation->donor_phone
             ],
             'item_details' => [
                 [
@@ -201,7 +201,7 @@ if ($donation->payment_status === 'pending') {
         ],
         'customer_details' => [
             'first_name' => $donation->user->name,
-            'email' => $donation->user->email
+            'phone' => $donation->user->phone
         ],
         'item_details' => [
             [
@@ -240,7 +240,17 @@ if ($donation->payment_status === 'pending') {
         }
 
         $donation->save();
+// ✅ Jika status berubah ke success → kirim WA
+if ($oldStatus !== 'success' && $donation->payment_status === 'success') {
+    $donation->campaign->updateCollectedAmount();
 
+    if ($donation->user && $donation->user->phone) {
+        $pesan = "Halo {$donation->user->name}, terima kasih atas donasi Anda sebesar Rp"
+               . number_format($donation->amount, 0, ',', '.')
+               . " untuk campaign \"{$donation->campaign->title}\". Donasi Anda sudah kami terima 🙏😊";
+        kirimWa($donation->user->phone, $pesan);
+    }
+}
         // Panggil updateCollectedAmount jika status berubah ke 'success'
         if ($oldStatus !== 'success' && $donation->payment_status === 'success') {
             $donation->campaign->updateCollectedAmount();

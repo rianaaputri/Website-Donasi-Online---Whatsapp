@@ -1,4 +1,4 @@
-<?php
+<?php 
 
 namespace App\Http\Controllers\Auth;
 
@@ -27,35 +27,36 @@ class LoginController extends Controller
     }
 
     /**
-     * ✅ Proses login user
+     * ✅ Proses login user pakai phone
      */
     public function login(Request $request)
     {
         try {
-            Log::info("Proses login dimulai", ['email' => $request->email]);
+            Log::info("Proses login dimulai", ['phone' => $request->phone]);
 
+            // Validasi input
             $credentials = $request->validate([
-                'email'    => ['required', 'email'],
+                'phone'    => ['required', 'string', 'max:20'],
                 'password' => ['required'],
             ]);
 
+            // Attempt login
             if (Auth::attempt($credentials, $request->filled('remember'))) {
                 $user = Auth::user();
-                Log::info("Login berhasil", ['user_id' => $user->id, 'email' => $user->email]);
+                Log::info("Login berhasil", ['user_id' => $user->id, 'phone' => $user->phone]);
 
-                // 🔒 Cek apakah email sudah diverifikasi
-                if (method_exists($user, 'hasVerifiedEmail') && ! $user->hasVerifiedEmail()) {
-                    Log::warning("User mencoba login tanpa verifikasi email", ['user_id' => $user->id]);
+                // 🔒 Jika kamu ingin pakai verifikasi nomor (WA/OTP), bisa cek di sini
+                if (method_exists($user, 'hasVerifiedPhone') && ! $user->hasVerifiedPhone()) {
+                    Log::warning("User mencoba login tanpa verifikasi phone", ['user_id' => $user->id]);
 
                     Auth::logout();
                     $request->session()->invalidate();
                     $request->session()->regenerateToken();
 
-                    // 🚨 ALERT + LINK ke verifikasi
                     return redirect()->route('login')->with([
-                        'warning' => 'Akun Anda belum diverifikasi. 
+                        'warning' => 'Nomor HP Anda belum diverifikasi. 
                             <a href="'.route('verification.notice').'" class="underline text-blue-600">
-                                Klik di sini untuk verifikasi email
+                                Klik di sini untuk verifikasi nomor
                             </a>.'
                     ]);
                 }
@@ -70,16 +71,16 @@ class LoginController extends Controller
             }
 
             // ⚠️ Jika login gagal → cek user
-            $user = User::where('email', $request->email)->first();
+            $user = User::where('phone', $request->phone)->first();
 
             if (! $user) {
-                Log::warning("Login gagal: email tidak ditemukan", ['email' => $request->email]);
+                Log::warning("Login gagal: phone tidak ditemukan", ['phone' => $request->phone]);
                 return back()->withErrors([
-                    'email' => 'Email tidak ditemukan dalam sistem kami.',
+                    'phone' => 'Nomor HP tidak ditemukan dalam sistem kami.',
                 ])->withInput();
             }
 
-            Log::warning("Login gagal: password salah", ['email' => $request->email]);
+            Log::warning("Login gagal: password salah", ['phone' => $request->phone]);
             return back()->withErrors([
                 'password' => 'Password yang Anda masukkan salah.',
             ])->withInput();
@@ -96,14 +97,14 @@ class LoginController extends Controller
     public function logout(Request $request)
     {
         try {
-            $role = auth()->check() ? auth()->user()->role : null;
-            $email = auth()->check() ? auth()->user()->email : null;
+            $role  = auth()->check() ? auth()->user()->role : null;
+            $phone = auth()->check() ? auth()->user()->phone : null;
 
             Auth::logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();
 
-            Log::info("User logout", ['email' => $email, 'role' => $role]);
+            Log::info("User logout", ['phone' => $phone, 'role' => $role]);
 
             return $role === 'admin'
                 ? redirect()->route('login')->with('success', 'Berhasil logout dari akun Admin.')
