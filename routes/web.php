@@ -15,20 +15,18 @@ use App\Http\Controllers\{
     AdminDashboardController,
     CampaignController
 };
-use App\Http\Controllers\Auth\PasswordController;
+use App\Http\Controllers\Auth\CampaignCreatorRegisterController;
+use App\Http\Controllers\Creator\CreatorDashboardController;
+use App\Http\Controllers\Auth\RegisterController;
+use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Admin\DonationController as AdminDonationController;
 use App\Http\Controllers\Admin\CampaignController as AdminCampaignController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\User\CampaignController as UserCampaignController;
 
-use App\Http\Controllers\Auth\CampaignCreatorRegisterController;
-use App\Http\Controllers\Creator\CreatorDashboardController;
-use App\Http\Controllers\Auth\RegisterController;
-use App\Http\Controllers\Auth\RegisteredUserController;
-
 /*
 |--------------------------------------------------------------------------
-| Guest Routes (Belum Login)
+| Guest Routes
 |--------------------------------------------------------------------------
 */
 Route::middleware('guest')->group(function () {
@@ -40,7 +38,7 @@ Route::middleware('guest')->group(function () {
     Route::get('/register', [RegisterController::class, 'register'])->name('register');
     Route::post('/register/user', [RegisterController::class, 'submitRegister'])->name('register.submit');
 
-    // OTP Register User
+    // OTP User
     Route::get('register/otp', [RegisteredUserController::class, 'formOtp'])->name('otp.form');
     Route::post('register/otp', [RegisteredUserController::class, 'submitOtp'])->name('otp.submit');
     Route::post('register/otp/resend', [RegisteredUserController::class, 'resendOtp'])->name('otp.resend');
@@ -75,22 +73,14 @@ Route::get('/', [HomeController::class, 'index'])->name('home');
 Route::get('/campaign/{id}', [HomeController::class, 'showCampaign'])->name('campaign.show');
 Route::get('/campaign-detail/{id}', [CampaignController::class, 'detail'])->name('campaign.detail');
 
-/*
-|--------------------------------------------------------------------------
-| Support Pages
-|--------------------------------------------------------------------------
-*/
+// Support Pages
 Route::get('/faq', [SupportController::class, 'faq'])->name('faq');
 Route::get('/cara-berdonasi', [SupportController::class, 'donationGuide'])->name('donation.guide');
 Route::get('/hubungi-kami', [SupportController::class, 'contact'])->name('contact');
 Route::post('/hubungi-kami', [SupportController::class, 'sendContact'])->name('contact.send');
 Route::get('/pusat-bantuan', [SupportController::class, 'supportCenter'])->name('support.center');
 
-/*
-|--------------------------------------------------------------------------
-| Donation Public Routes
-|--------------------------------------------------------------------------
-*/
+// Donation Public
 Route::prefix('donation')->name('donation.')->group(function () {
     Route::get('/', [DonationController::class, 'index'])->name('index');
     Route::get('/create/{campaign}', [DonationController::class, 'create'])->name('create');
@@ -107,18 +97,10 @@ Route::prefix('donation')->name('donation.')->group(function () {
     });
 });
 
-/*
-|--------------------------------------------------------------------------
-| Midtrans Callback
-|--------------------------------------------------------------------------
-*/
+// Midtrans Callback
 Route::post('/midtrans/callback', [MidtransController::class, 'handleCallback'])->name('midtrans.callback');
 
-/*
-|--------------------------------------------------------------------------
-| Dashboard Redirect
-|--------------------------------------------------------------------------
-*/
+// Dashboard redirect
 Route::get('/dashboard', function () {
     $user = auth()->user();
     return $user->role === 'admin'
@@ -126,20 +108,12 @@ Route::get('/dashboard', function () {
         : redirect()->route('home');
 })->middleware(['auth'])->name('dashboard');
 
-/*
-|--------------------------------------------------------------------------
-| Creator Dashboard
-|--------------------------------------------------------------------------
-*/
+// Creator Dashboard
 Route::get('/creator/dashboard', [CreatorDashboardController::class, 'index'])
     ->name('creator.dashboard')
     ->middleware(['auth']);
 
-/*
-|--------------------------------------------------------------------------
-| Profile Routes (User) - FULL & BENAR
-|--------------------------------------------------------------------------
-*/
+// Profile Routes
 Route::middleware(['auth'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show');
     Route::get('/profile/edit', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -147,17 +121,13 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/profile/password/update', [ProfileController::class, 'updatePassword'])->name('profile.password.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
-    // 🔐 OTP Routes (untuk ganti nomor HP)
+    // OTP Routes
     Route::get('/profile/otp', [ProfileController::class, 'formOtp'])->name('profile.otp');
     Route::post('/profile/otp', [ProfileController::class, 'submitOtp'])->name('profile.submit.otp');
     Route::post('/profile/otp/resend', [ProfileController::class, 'resendOtp'])->name('profile.resend.otp');
 });
 
-/*
-|--------------------------------------------------------------------------
-| User Campaign Routes
-|--------------------------------------------------------------------------
-*/
+// User Campaign Routes
 Route::middleware(['auth', 'role.check:user,campaign_creator'])
     ->prefix('user')
     ->name('user.')
@@ -189,6 +159,7 @@ Route::prefix('admin')
         Route::post('/update-status', [AdminController::class, 'updateStatus'])->name('update-status');
         Route::post('/show-user', [AdminController::class, 'showUser'])->name('show-user');
         Route::get('/show-user/{id}', [AdminController::class, 'showUserDetail'])->name('show-user-detail');
+        Route::post('/verify-phone', [AdminController::class, 'verifyPhone'])->name('verify-phone');
         Route::delete('/delete-admin/{id}', [AdminController::class, 'deleteAdmin'])->name('delete-admin');
 
         // User Management
@@ -206,12 +177,11 @@ Route::prefix('admin')
             Route::post('/bulk-action', [AdminUserController::class, 'bulkAction'])->name('bulk-action');
         });
 
-        // Campaign Verification
+        // Campaign Verification & CRUD
         Route::get('/campaigns/verify', [AdminCampaignController::class, 'verifyIndex'])->name('campaigns.verify');
         Route::patch('/campaigns/{campaign}/verify', [AdminCampaignController::class, 'verifyApprove'])->name('campaigns.verify.approve');
         Route::patch('/campaigns/{campaign}/reject', [AdminCampaignController::class, 'verifyReject'])->name('campaigns.verify.reject');
 
-        // CRUD Campaign
         Route::prefix('campaigns')->name('campaigns.')->group(function () {
             Route::get('/', [AdminCampaignController::class, 'index'])->name('index');
             Route::get('/create', [AdminCampaignController::class, 'create'])->name('create');

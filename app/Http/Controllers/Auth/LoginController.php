@@ -1,4 +1,4 @@
-<?php 
+<?php
 
 namespace App\Http\Controllers\Auth;
 
@@ -27,7 +27,7 @@ class LoginController extends Controller
     }
 
     /**
-     * ✅ Proses login user pakai phone
+     * ✅ Proses login user pakai phone + password
      */
     public function login(Request $request)
     {
@@ -43,31 +43,26 @@ class LoginController extends Controller
             // Attempt login
             if (Auth::attempt($credentials, $request->filled('remember'))) {
                 $user = Auth::user();
-                Log::info("Login berhasil", ['user_id' => $user->id, 'phone' => $user->phone]);
+                Log::info("Login berhasil", [
+                    'user_id' => $user->id,
+                    'phone'   => $user->phone,
+                    'role'    => $user->role
+                ]);
 
-                // 🔒 Jika kamu ingin pakai verifikasi nomor (WA/OTP), bisa cek di sini
-                if (method_exists($user, 'hasVerifiedPhone') && ! $user->hasVerifiedPhone()) {
-                    Log::warning("User mencoba login tanpa verifikasi phone", ['user_id' => $user->id]);
-
-                    Auth::logout();
-                    $request->session()->invalidate();
-                    $request->session()->regenerateToken();
-
-                    return redirect()->route('login')->with([
-                        'warning' => 'Nomor HP Anda belum diverifikasi. 
-                            <a href="'.route('verification.notice').'" class="underline text-blue-600">
-                                Klik di sini untuk verifikasi nomor
-                            </a>.'
-                    ]);
-                }
-
-                // 🔒 Regenerasi session untuk keamanan
+                // Regenerasi session untuk keamanan
                 $request->session()->regenerate();
 
                 // 🔀 Redirect sesuai role
-                return $user->role === 'admin'
-                    ? redirect()->intended(route('admin.dashboard'))->with('success', 'Selamat datang Admin!')
-                    : redirect()->intended(RouteServiceProvider::HOME)->with('success', 'Login berhasil. Selamat datang!');
+                if ($user->role === 'admin') {
+                    return redirect()->intended(route('admin.dashboard'))
+                        ->with('success', 'Selamat datang Admin!');
+                } elseif ($user->role === 'campaign_creator') {
+                    return redirect()->intended(route('campaign.dashboard'))
+                        ->with('success', 'Selamat datang Campaign Creator!');
+                } else {
+                    return redirect()->intended(RouteServiceProvider::HOME)
+                        ->with('success', 'Login berhasil. Selamat datang!');
+                }
             }
 
             // ⚠️ Jika login gagal → cek user
@@ -106,9 +101,17 @@ class LoginController extends Controller
 
             Log::info("User logout", ['phone' => $phone, 'role' => $role]);
 
-            return $role === 'admin'
-                ? redirect()->route('login')->with('success', 'Berhasil logout dari akun Admin.')
-                : redirect(RouteServiceProvider::HOME)->with('success', 'Berhasil logout.');
+            // Redirect sesuai role
+            if ($role === 'admin') {
+                return redirect()->route('login')
+                    ->with('success', 'Berhasil logout dari akun Admin.');
+            } elseif ($role === 'campaign_creator') {
+                return redirect()->route('login')
+                    ->with('success', 'Berhasil logout dari akun Campaign Creator.');
+            } else {
+                return redirect()->route('login')
+                    ->with('success', 'Berhasil logout.');
+            }
         } catch (Exception $e) {
             Log::error("Error saat logout: " . $e->getMessage());
             return redirect()->route('login')->with('error', 'Terjadi kesalahan saat logout.');
