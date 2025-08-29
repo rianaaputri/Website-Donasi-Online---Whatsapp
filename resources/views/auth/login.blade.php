@@ -465,6 +465,28 @@
       background-size: 200px 100%;
       animation: shimmer 1.5s ease-in-out infinite;
     }
+    /* Hilangkan spinner pada number/tel input */
+input[type="number"]::-webkit-inner-spin-button, 
+input[type="number"]::-webkit-outer-spin-button, 
+input[type="tel"]::-webkit-inner-spin-button, 
+input[type="tel"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="tel"] {
+  border: 2px solid var(--border-color) !important;
+  border-radius: 16px !important;
+  padding: 1rem 1.25rem !important;
+  font-size: 0.95rem !important;
+  background-color: rgba(248, 250, 252, 0.5) !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  width: 100% !important;
+  min-height: 3.5rem !important;
+  height: 3.5rem !important;
+  font-family: 'Poppins', sans-serif !important;
+}
+
   </style>
 </head>
 <body>
@@ -521,30 +543,24 @@
     <div class="login-header">
       <h3>Sign In</h3>
     </div>
-
-    @if(session('error'))
-      <div class="alert alert-danger bounce-in">
-        {!! session('error') !!}
-        @if(str_contains(session('error'), 'verifikasi'))
-          <br>
-          <a href="{{ route('verification.notice') }}" class="fw-bold">Klik di sini untuk verifikasi</a>
-        @endif
-      </div>
-    @endif
-
-    <form method="POST" action="{{ route('login') }}" id="loginForm">
+<form method="POST" action="{{ route('login') }}" id="loginForm">
       @csrf
 
-      <!-- Email -->
+      <!-- Phone -->
       <div class="form-group">
         <div class="floating-label">
-          <input id="email" type="email" name="email" value="{{ old('email') }}" required autofocus autocomplete="username" placeholder=" " onblur="validateEmail()" onkeyup="validateEmail()" />
-          <label for="email"><i class="bi bi-envelope"></i> Email (Gmail)</label>
+         <input id="phone" type="tel" name="phone" 
+       pattern="[0-9]*" inputmode="numeric"
+       value="{{ old('phone') }}" required autofocus
+       autocomplete="username" placeholder=" "
+       onblur="validatePhone()" onkeyup="validatePhone()" />
+
+          <label for="phone"><i class="bi bi-telephone-fill"></i> Nomor HP</label>
         </div>
-        @error('email')
+        @error('phone')
           <div class="error-message bounce-in"><ul><li>{{ $message }}</li></ul></div>
         @enderror
-        <div id="emailMessage"></div>
+        <div id="phoneMessage"></div>
       </div>
 
       <!-- Password -->
@@ -585,11 +601,10 @@
 
 <script>
   const friendlyMessages = {
-    email: {
-      invalid: "Format email tidak valid!",
-      noAt: "Email harus menggunakan tanda @",
-      notGmail: "Email harus menggunakan domain @gmail.com!",
-      noUsername: "Email tidak boleh kosong sebelum @gmail.com!"
+    phone: {
+      tooShort: "Nomor HP minimal 10 digit!",
+      tooLong: "Nomor HP maksimal 15 digit!",
+      invalid: "Nomor HP hanya boleh angka!"
     },
     password: {
       tooShort: "Password minimal 6 karakter ya biar aman!"
@@ -616,37 +631,36 @@
     `;
   }
 
-  function validateEmail() {
-    const email = document.getElementById('email').value.trim().toLowerCase();
-    const field = document.getElementById('email');
-    
-    if (email === '') {
+  function validatePhone() {
+    const phone = document.getElementById('phone').value.trim();
+    const field = document.getElementById('phone');
+
+    if (phone === '') {
       field.className = '';
-      showMessage('emailMessage', '');
-      return true; 
+      showMessage('phoneMessage', '');
+      return true;
     }
-    
-    if (!email.includes('@')) {
+
+    if (!/^[0-9]+$/.test(phone)) {
       field.className = 'needs-attention';
-      showMessage('emailMessage', friendlyMessages.email.noAt, 'helper');
+      showMessage('phoneMessage', friendlyMessages.phone.invalid, 'helper');
       return false;
     }
-    
-    if (!email.endsWith('@gmail.com')) {
+
+    if (phone.length < 10) {
       field.className = 'needs-attention';
-      showMessage('emailMessage', friendlyMessages.email.notGmail, 'helper');
+      showMessage('phoneMessage', friendlyMessages.phone.tooShort, 'helper');
       return false;
     }
-    
-    const username = email.split('@')[0];
-    if (username.length === 0) {
+
+    if (phone.length > 15) {
       field.className = 'needs-attention';
-      showMessage('emailMessage', friendlyMessages.email.noUsername, 'helper');
+      showMessage('phoneMessage', friendlyMessages.phone.tooLong, 'helper');
       return false;
     }
-    
+
     field.className = 'looks-good';
-    showMessage('emailMessage', '');
+    showMessage('phoneMessage', '');
     return true;
   }
 
@@ -702,7 +716,7 @@
       });
     });
 
-    // Enhanced toggle password accessibility
+    // Toggle password accessibility
     document.querySelectorAll('.toggle-password').forEach(toggle => {
       toggle.addEventListener('keydown', function(e) {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -714,9 +728,9 @@
 
     // Form validation
     form.addEventListener('submit', function(e) {
-      const isEmailValid = validateEmail();
+      const isPhoneValid = validatePhone();
       const isPasswordValid = validatePassword();
-      if (!isEmailValid || !isPasswordValid) {
+      if (!isPhoneValid || !isPasswordValid) {
         e.preventDefault();
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }

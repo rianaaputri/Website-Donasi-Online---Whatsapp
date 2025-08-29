@@ -633,12 +633,7 @@
     </style>
 </head>
 <body>
-    <!-- 🔥 REDIRECT OTOMATIS JIKA EMAIL BELUM DIVERIFIKASI -->
-    @if (!Auth::user()->hasVerifiedEmail())
-        <script>
-            window.location.href = '/email/verify';
-        </script>
-    @endif
+ 
 
     <div class="container-fluid px-3 px-md-4">
         <header class="page-header animate-fade-in-down">
@@ -681,19 +676,7 @@
                                         <i class="fas fa-user-tag me-2"></i>
                                         {{ ucfirst(Auth::user()->role ?? 'User') }}
                                     </p>
-                                    <div class="d-flex justify-content-center">
-                                        @if(Auth::user()->hasVerifiedEmail())
-                                            <span class="badge-custom badge-verified">
-                                                <i class="fas fa-shield-check"></i>
-                                                Email Terverifikasi
-                                            </span>
-                                        @else
-                                            <span class="badge-custom badge-unverified">
-                                                <i class="fas fa-exclamation-triangle"></i>
-                                                Email Belum Terverifikasi
-                                            </span>
-                                        @endif
-                                    </div>
+                                    
                                 </div>
                                 <div class="col-lg-4">
                                     <div class="d-flex flex-column gap-3 align-items-center mt-4 mt-lg-0">
@@ -730,11 +713,7 @@
                                             <div class="view-mode"><div class="info-value" id="displayNameValue">{{ Auth::user()->name }}</div></div>
                                             <div class="edit-mode d-none"><input type="text" class="form-control" name="name" id="nameInput" value="{{ Auth::user()->name }}" required></div>
                                         </div>
-                                        <div class="info-item mode-transition">
-                                            <div class="info-label">Alamat Email</div>
-                                            <div class="view-mode"><div class="info-value" id="displayEmailValue">{{ Auth::user()->email }}</div></div>
-                                            <div class="edit-mode d-none"><input type="email" class="form-control" name="email" id="emailInput" value="{{ Auth::user()->email }}" required></div>
-                                        </div>
+                                  
                                         <div class="info-item mode-transition">
                                             <div class="info-label">Nomor Telepon</div>
                                             <div class="view-mode"><div class="info-value" id="phoneDisplayValue">{{ Auth::user()->phone ?? 'Belum diisi' }}</div></div>
@@ -777,11 +756,7 @@
                                         <div class="view-mode">
                                             <div class="d-flex flex-wrap gap-3 justify-content-center">
                                                 <a href="/" class="btn btn-outline-primary hover-lift"><i class="fas fa-home me-2"></i>Kembali ke Beranda</a>
-                                                @if(!Auth::user()->hasVerifiedEmail())
-                                                    <button type="button" class="btn btn-outline-success hover-lift" onclick="sendVerificationEmail()">
-                                                        <i class="fas fa-envelope me-2"></i>Kirim Verifikasi Email
-                                                    </button>
-                                                @endif
+                                               
                                             </div>
                                         </div>
                                         <div class="edit-mode d-none">
@@ -890,6 +865,14 @@
             passwordModal = new bootstrap.Modal(document.getElementById('passwordModal'));
         }
 
+        function addAnimations() {
+            // Add staggered animation delays
+            const staggerElements = document.querySelectorAll('.stagger > *');
+            staggerElements.forEach((el, index) => {
+                el.style.animationDelay = `${(index + 1) * 0.1}s`;
+            });
+        }
+
         function setupEventListeners() {
             document.getElementById('profileForm').addEventListener('submit', (e) => {
                 if (!checkNetworkStatus()) e.preventDefault();
@@ -912,25 +895,24 @@
             btnText.textContent = 'Menyimpan...';
 
             try {
-                // 🔍 Ambil data dari form
+                // Ambil data dari form
                 const formData = new FormData(form);
                 const data = {
                     name: formData.get('name'),
-                    email: formData.get('email'),
                     phone: formData.get('phone'),
                     address: formData.get('address')
                 };
 
-                // 🔍 Cek apakah ada perubahan dari data asli
+                // Cek apakah ada perubahan dari data asli
                 const isChanged = Object.keys(data).some(key => data[key] !== originalFormData[key]);
 
-                // ❌ Jika tidak ada perubahan, jangan kirim & jangan tampilkan toast
+                // Jika tidak ada perubahan, jangan kirim & jangan tampilkan toast
                 if (!isChanged) {
                     exitEditMode();
                     return;
                 }
 
-                // ✅ Kirim ke server
+                // Kirim ke server
                 const response = await fetch(form.action, {
                     method: 'POST',
                     headers: {
@@ -952,24 +934,38 @@
                     return;
                 }
 
-                // ✅ Update UI
-                updateViewModeWithNewData(data, result.email_changed);
+                // Update UI
+               function updateViewModeWithNewData(changes) {
+    // Hanya update berdasarkan field yang dikembalikan server
+    if (changes.name !== undefined) {
+        document.getElementById('displayNameValue').textContent = changes.name;
+        document.getElementById('displayName').textContent = changes.name;
+    }
+    
+    if (changes.phone !== undefined) {
+        document.getElementById('phoneDisplayValue').textContent = changes.phone || 'Belum diisi';
+    }
+    
+    if (changes.address !== undefined) {
+        document.getElementById('addressDisplayValue').textContent = changes.address || 'Belum diisi';
+    }
+}
                 exitEditMode();
 
-                // 🟢 TAMPILKAN TOAST HANYA JIKA ADA PERUBAHAN
+                // Tampilkan toast hanya jika ada perubahan
                 showToast(result.message || 'Profil berhasil diperbarui!', 'success');
                 storeOriginalData(); // update data asli
 
-                // 🔥 Redirect jika email berubah
-                if (result.email_changed) {
+                // Redirect jika phone berubah dan perlu verifikasi
+                if (result.phone_changed && result.requires_verification) {
                     setTimeout(() => {
-                        window.location.href = '/email/verify';
+                        window.location.href = '/phone/verify';
                     }, 1500);
                 }
 
             } catch (error) {
                 console.error('Error:', error);
-                showToast('Email ini sudah terdaftar. Gunakan email lain.', 'error');
+                showToast('Nomor telepon ini sudah terdaftar. Gunakan nomor lain.', 'error');
             } finally {
                 saveBtn.disabled = false;
                 saveBtn.classList.remove('btn-loading');
@@ -977,22 +973,10 @@
             }
         }
 
-        function updateViewModeWithNewData(data, emailChanged = false) {
+        function updateViewModeWithNewData(data, phoneChanged = false) {
             if (data.name) {
                 document.getElementById('displayNameValue').textContent = data.name;
                 document.getElementById('displayName').textContent = data.name;
-            }
-            if (data.email) {
-                document.getElementById('displayEmailValue').textContent = data.email;
-                const badgeContainer = document.querySelector('.profile-header .d-flex.justify-content-center');
-                let badge = badgeContainer.querySelector('.badge-custom');
-                if (badge) badge.remove();
-                const newBadge = document.createElement('span');
-                newBadge.className = `badge-custom ${emailChanged ? 'badge-unverified' : 'badge-verified'}`;
-                newBadge.innerHTML = emailChanged
-                    ? '<i class="fas fa-exclamation-triangle"></i> Email Belum Terverifikasi'
-                    : '<i class="fas fa-shield-check"></i> Email Terverifikasi';
-                badgeContainer.appendChild(newBadge);
             }
             if (data.phone !== undefined) {
                 document.getElementById('phoneDisplayValue').textContent = data.phone || 'Belum diisi';
@@ -1000,6 +984,9 @@
             if (data.address !== undefined) {
                 document.getElementById('addressDisplayValue').textContent = data.address || 'Belum diisi';
             }
+            if (result.changes) {
+    updateViewModeWithNewData(result.changes);
+}
         }
 
         function toggleEditMode() {
@@ -1104,14 +1091,13 @@
         function storeOriginalData() {
             originalFormData = {
                 name: document.getElementById('nameInput')?.value || '',
-                email: document.getElementById('emailInput')?.value || '',
                 phone: document.getElementById('phoneInput')?.value || '',
                 address: document.getElementById('addressInput')?.value || ''
             };
         }
 
         function restoreOriginalData() {
-            const fields = ['nameInput', 'emailInput', 'phoneInput', 'addressInput'];
+            const fields = ['nameInput', 'phoneInput', 'addressInput'];
             fields.forEach(id => {
                 const input = document.getElementById(id);
                 if (input) input.value = originalFormData[id.replace('Input', '')] || '';
@@ -1149,7 +1135,6 @@
             }
         }
 
-        // Tambahkan fungsi untuk modal password
         function showPasswordModal() {
             passwordModal.show();
         }

@@ -293,16 +293,18 @@
       </div>
 
       <!-- Phone -->
-        <div class="form-group mt-4">
-        <div class="floating-label">
-          <input id="phone" type="number" name="phone" value="{{ old('phone') }}" required placeholder="phone " />
-          <label for="phone"><i class="bi bi-envelope"></i> phone</label>
-        </div>
-        @error('phone')
-          <div class="error-message bounce-in">{{ $message }}</div>
-        @enderror
-        <div id="phoneMessage"></div>
-      </div>
+      <div class="form-floating mb-3">
+    <input type="tel" class="form-control @error('phone') is-invalid @enderror" 
+           id="phone" name="phone" placeholder="phone" 
+           value="{{ old('phone') }}" required autocomplete="tel">
+    <label for="phone">
+        <i class="bi bi-telephone me-2"></i> Phone
+    </label>
+    @error('phone')
+        <div class="validation-message error">{{ $message }}</div>
+    @enderror
+    <div id="phoneValidation" class="validation-message" style="display: none;"></div>
+</div>
 
       <!-- Password -->
       <div class="form-group mt-4">

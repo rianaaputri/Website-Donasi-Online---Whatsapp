@@ -121,6 +121,6 @@ public function submitOtp(Request $request)
     session()->forget('pending_register');
     auth()->login($user);
 
-    return redirect()->route('home.index')->with('sukses', 'Registrasi berhasil!');
+    return redirect()->route('home')->with('sukses', 'Registrasi berhasil!');
 }
 }
