@@ -24,9 +24,10 @@ class User extends Authenticatable
         'role',
         'is_active',
         'avatar',
-        'otp',             // ➕ untuk menyimpan kode OTP
-        'otp_expires_at',  // ➕ waktu kadaluarsa OTP
-        'is_verified',     // ➕ status verifikasi via OTP
+        'otp',
+        'otp_expires_at',
+        'is_verified',
+        'phone_verified_at',
     ];
 
     /**

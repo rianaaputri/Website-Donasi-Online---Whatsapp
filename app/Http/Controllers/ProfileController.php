@@ -12,9 +12,15 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Carbon\Carbon;
 use App\Models\Otp;
+use Illuminate\Validation\Rule;
 
 class ProfileController extends Controller
 {
+    public function __construct()
+    {
+        $this->middleware('auth');
+    }
+
     /**
      * Tampilkan halaman profil.
      */
@@ -46,54 +52,98 @@ class ProfileController extends Controller
         ]);
 
         $pesan = "Halo $nama, kode OTP verifikasi nomor WhatsApp Anda adalah: $otp (berlaku 1 menit).";
-        kirimWa($phone, $pesan); // fungsi helper kamu
+        kirimWa($phone, $pesan);
     }
 
     /**
      * Update profil user.
      */
-    public function update(Request $request): RedirectResponse
+    public function update(Request $request): JsonResponse
     {
         $user = Auth::user();
 
-        $request->validate([
-            'name'    => 'required|string|max:255',
-            'phone'   => 'required|numeric',
+        // Validasi input
+        $validatedData = $request->validate([
+            'name' => 'required|string|max:255',
+            'phone' => [
+                'required',
+                'string',
+                'regex:/^628[0-9]{8,13}$/',
+                Rule::unique('users', 'phone')->ignore($user->id)
+            ],
             'address' => 'required|string|max:255',
-            'avatar'  => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+            'avatar' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+        ], [
+            'phone.regex' => 'Format nomor WhatsApp tidak valid. Gunakan format 628123456789.',
+            'phone.unique' => 'Nomor telepon ini sudah digunakan oleh akun lain.',
         ]);
 
-        // Jika nomor tidak berubah → update langsung
-        if ($request->phone === $user->phone) {
-            $user->name = $request->name;
-            $user->address = $request->address;
+        // Cek perubahan data
+        $changes = [];
+        $phoneChanged = false;
+
+        if ($validatedData['name'] !== $user->name) {
+            $changes['name'] = $validatedData['name'];
+        }
+
+        if ($validatedData['phone'] !== $user->phone) {
+            $changes['phone'] = $validatedData['phone'];
+            $phoneChanged = true;
+        }
+
+        if ($validatedData['address'] !== $user->address) {
+            $changes['address'] = $validatedData['address'];
+        }
+
+        // Jika tidak ada perubahan
+        if (empty($changes) && !$request->hasFile('avatar')) {
+            return response()->json([
+                'message' => 'Tidak ada perubahan yang disimpan.',
+                'no_changes' => true
+            ]);
+        }
+
+        // Jika nomor tidak berubah, update langsung
+        if (!$phoneChanged) {
+            $user->fill($changes);
 
             if ($request->hasFile('avatar')) {
-                if ($user->avatar) Storage::delete($user->avatar);
+                if ($user->avatar) {
+                    Storage::delete($user->avatar);
+                }
                 $user->avatar = $request->file('avatar')->store('avatar');
             }
 
             $user->save();
-            return redirect()->route('profile.index')->with('success', 'Profil berhasil diperbarui.');
+
+            return response()->json([
+                'message' => 'Profil berhasil diperbarui.',
+                'changes' => $changes
+            ]);
         }
 
-        // Jika nomor berubah → simpan ke session
+        // Jika nomor berubah, simpan ke session untuk verifikasi
         $avatarPath = null;
         if ($request->hasFile('avatar')) {
             $avatarPath = $request->file('avatar')->store('temp/avatar');
         }
 
         session(['pending_update' => [
-            'step'    => 'verify_old',
-            'name'    => $request->name,
-            'phone'   => $request->phone,
-            'avatar'  => $avatarPath,
-            'address' => $request->address,
+            'step' => 'verify_old',
+            'name' => $validatedData['name'],
+            'phone' => $validatedData['phone'],
+            'avatar' => $avatarPath,
+            'address' => $validatedData['address'],
         ]]);
 
-        $this->kirimOtp($user->phone, $request->name);
+        $this->kirimOtp($user->phone, $validatedData['name']);
 
-        return redirect()->route('profile.otp')->with('info', 'OTP sudah dikirim ke nomor lama Anda.');
+        return response()->json([
+            'message' => 'OTP sudah dikirim ke nomor lama Anda.',
+            'phone_changed' => true,
+            'requires_verification' => true,
+            'redirect_url' => route('profile.otp')
+        ]);
     }
 
     /**
@@ -140,7 +190,6 @@ class ProfileController extends Controller
         }
 
         $user = Auth::user();
-
         $phoneCheck = $data['step'] === 'verify_old' ? $user->phone : $data['phone'];
 
         $otpRecord = Otp::where('phone', $phoneCheck)
@@ -156,21 +205,23 @@ class ProfileController extends Controller
             return back()->with('gagal', 'Kode OTP sudah kedaluwarsa, silakan kirim ulang.');
         }
 
-        // Step 1 → verifikasi nomor lama
+        // Step 1: verifikasi nomor lama
         if ($data['step'] === 'verify_old') {
             session(['pending_update' => array_merge($data, ['step' => 'verify_new'])]);
             $this->kirimOtp($data['phone'], $data['name']);
             return redirect()->route('profile.otp')->with('success', 'OTP sudah dikirim ke nomor baru, silakan verifikasi.');
         }
 
-        // Step 2 → verifikasi nomor baru
+        // Step 2: verifikasi nomor baru
         if ($data['step'] === 'verify_new') {
             $user->name = $data['name'];
             $user->phone = $data['phone'];
             $user->address = $data['address'];
 
             if ($data['avatar']) {
-                if ($user->avatar) Storage::delete($user->avatar);
+                if ($user->avatar) {
+                    Storage::delete($user->avatar);
+                }
                 $user->avatar = Storage::move($data['avatar'], str_replace('temp/', '', $data['avatar']));
             }
 
@@ -179,7 +230,7 @@ class ProfileController extends Controller
 
             session()->forget('pending_update');
 
-            return redirect()->route('profile.index')->with('success', 'Nomor berhasil diverifikasi dan profil diperbarui.');
+            return redirect()->route('profile.show')->with('success', 'Nomor berhasil diverifikasi dan profil diperbarui.');
         }
     }
 
@@ -202,9 +253,11 @@ class ProfileController extends Controller
         $user = $request->user();
 
         if (!Hash::check($request->current_password, $user->password)) {
-            return response()->json(['errors' => [
-                'current_password' => ['Password saat ini salah.']
-            ]], 422);
+            return response()->json([
+                'errors' => [
+                    'current_password' => ['Password saat ini salah.']
+                ]
+            ], 422);
         }
 
         $user->password = Hash::make($request->password);
