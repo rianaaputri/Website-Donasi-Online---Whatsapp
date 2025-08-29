@@ -77,9 +77,11 @@ Route::get('register/otp',[RegisteredUserController::class, 'formOtp'])->name('o
 Route::post('register/otp',[RegisteredUserController::class, 'submitOtp'])->name('otp.submit');
 Route::post('register/otp/resend',[RegisteredUserController::class, 'resendOtp'])->name('otp.resend');
 
-Route::get('/profile/otp', [ProfilememberController::class, 'formOtp'])->name('profile.otp');
-Route::post('/profile/otp', [ProfilememberController::class, 'submitOtp'])->name('profile.submit.otp');
-Route::post('/profile/otp/resend', [ProfilememberController::class, 'resendOtp'])->name('profile.resend.otp');
+Route::get('/profile/otp', [ProfileController::class, 'formOtp'])->name('profile.otp');
+Route::post('/profile/otp', [ProfileController::class, 'submitOtp'])->name('profile.submit.otp');
+Route::post('/profile/otp/resend', [ProfileController::class, 'resendOtp'])->name('profile.resend.otp');
+
+
 
     // Password Reset
     Route::get('/forgot-password', [PasswordResetLinkController::class, 'create'])->name('password.request');
