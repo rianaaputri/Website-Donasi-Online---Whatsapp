@@ -1,0 +1,114 @@
+@extends('layouts.app')
+
+@section('content')
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+
+            {{-- Card Edit Profil --}}
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Edit Profil</h4>
+                </div>
+
+                <div class="card-body">
+                    {{-- Pesan sukses --}}
+                    @if (session('status'))
+                        <div class="alert alert-success">{{ session('status') }}</div>
+                    @endif
+
+                    {{-- Form Edit --}}
+                    <form method="POST" action="{{ route('profile.update') }}" enctype="multipart/form-data">
+                        @csrf
+                        @method('PATCH')
+
+                        {{-- Nama --}}
+                        <div class="mb-3">
+                            <label for="name" class="form-label">Nama</label>
+                            <input id="name" type="text"
+                                class="form-control @error('name') is-invalid @enderror"
+                                name="name"
+                                value="{{ old('name', $user?->name) }}"
+                                required autofocus>
+
+                            @error('name')
+                                <span class="invalid-feedback">{{ $message }}</span>
+                            @enderror
+                        </div>
+
+                        {{-- Phone (WhatsApp) --}}
+                        <div class="mb-3">
+                            <label for="phone" class="form-label">No. WhatsApp</label>
+                            <input id="phone" type="text"
+                                class="form-control @error('phone') is-invalid @enderror"
+                                name="phone"
+                                value="{{ old('phone', $user?->phone) }}"
+                                placeholder="08xxxxxxxxxx">
+
+                            @error('phone')
+                                <span class="invalid-feedback">{{ $message }}</span>
+                            @enderror
+                        </div>
+
+                        {{-- Alamat --}}
+                        <div class="mb-3">
+                            <label for="address" class="form-label">Alamat</label>
+                            <textarea id="address" name="address"
+                                class="form-control @error('address') is-invalid @enderror"
+                                rows="3">{{ old('address', $user?->address) }}</textarea>
+
+                            @error('address')
+                                <span class="invalid-feedback">{{ $message }}</span>
+                            @enderror
+                        </div>
+
+                        {{-- Foto Profil --}}
+                        <div class="mb-3">
+                            <label for="avatar" class="form-label">Foto Profil</label>
+                            <input id="avatar" type="file"
+                                class="form-control @error('avatar') is-invalid @enderror"
+                                name="avatar" accept="image/*">
+
+                            @if ($user?->avatar)
+                                <img src="{{ Storage::url($user->avatar) }}" alt="Avatar"
+                                     class="rounded-circle mt-2" width="80" height="80">
+                            @endif
+
+                            @error('avatar')
+                                <span class="invalid-feedback">{{ $message }}</span>
+                            @enderror
+                        </div>
+
+                        {{-- Tombol --}}
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url()->previous() }}" class="btn btn-secondary">Batal</a>
+                            <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            {{-- Card Hapus Akun --}}
+            <div class="card shadow-sm border-0 mt-4">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0">Hapus Akun</h4>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Sekali akun dihapus, semua data akan hilang. Tindakan ini tidak bisa dibatalkan.</p>
+
+                    <form method="POST" action="{{ route('profile.destroy') }}">
+                        @csrf
+                        @method('DELETE')
+
+                        <button type="submit" class="btn btn-danger"
+                            onclick="return confirm('Apakah kamu yakin ingin menghapus akun ini secara permanen?')">
+                            Hapus Akun
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+@endsection

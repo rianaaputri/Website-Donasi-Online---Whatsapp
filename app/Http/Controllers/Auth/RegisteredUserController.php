@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Models\Otp;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -11,6 +12,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules;
 use Illuminate\View\View;
+use Carbon\Carbon;
 
 class RegisteredUserController extends Controller
 {
@@ -81,7 +83,6 @@ class RegisteredUserController extends Controller
     return back()->with('sukses', 'Kode OTP baru sudah dikirim ke WhatsApp.');
 }
 
-
 public function submitOtp(Request $request)
 {
     $request->validate([
@@ -107,20 +108,19 @@ public function submitOtp(Request $request)
     // OTP valid → hapus biar ga dipakai lagi
     $otpRecord->delete();
 
-    // Lanjut simpan user
+    // Simpan user baru
     $user = new User();
     $user->name = $data['name'];
     $user->phone = $data['phone'];
     $user->role = $data['role'];
     $user->password = bcrypt($data['password']);
-
     $user->save();
 
-  
-
+    // Hapus session
     session()->forget('pending_register');
-    auth()->login($user);
 
-    return redirect()->route('home')->with('sukses', 'Registrasi berhasil!');
+    // 🚀 Redirect ke halaman login (tanpa auto login)
+    return redirect()->route('login')->with('sukses', 'Registrasi berhasil! Silakan login.');
 }
+
 }

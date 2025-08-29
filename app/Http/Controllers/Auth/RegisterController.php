@@ -111,20 +111,18 @@ public function submitOtp(Request $request)
     // OTP valid → hapus biar ga dipakai lagi
     $otpRecord->delete();
 
-    // Lanjut simpan user
+    // Simpan user baru
     $user = new User();
     $user->name = $data['name'];
     $user->phone = $data['phone'];
     $user->role = $data['role'];
     $user->password = bcrypt($data['password']);
-
     $user->save();
 
-  
-
+    // Hapus session
     session()->forget('pending_register');
-    auth()->login($user);
 
-    return redirect()->route('home')->with('sukses', 'Registrasi berhasil!');
+    // 🚀 Redirect ke halaman login (tanpa auto login)
+    return redirect()->route('login')->with('sukses', 'Registrasi berhasil! Silakan login.');
 }
 }
