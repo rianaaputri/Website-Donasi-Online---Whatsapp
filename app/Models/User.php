@@ -150,4 +150,27 @@ class User extends Authenticatable
             }
         });
     }
+    /**
+ * Dapatkan nomor HP dalam format lokal (08)
+ */
+public function getFormattedPhoneAttribute()
+{
+    $phone = $this->phone;
+    if (!$phone) return 'Belum diisi';
+
+    // Hapus semua selain angka
+    $phone = preg_replace('/[^0-9]/', '', $phone);
+
+    // Cek apakah dimulai dengan 628
+    if (substr($phone, 0, 3) === '628') {
+        return '08' . substr($phone, 3);
+    }
+
+    // Jika dimulai dengan 08
+    if (substr($phone, 0, 2) === '08') {
+        return $phone;
+    }
+
+    return $phone;
+}
 }
