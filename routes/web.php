@@ -26,6 +26,32 @@ use App\Http\Controllers\Creator\CreatorDashboardController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\AuthController;
+
+Route::middleware('guest')->group(function () {
+    Route::get('/register/campaign-creator', [CampaignCreatorRegisterController::class, 'showRegistrationForm'])
+        ->name('campaign.creator.register.form');
+
+    Route::post('/register/campaign-creator', [CampaignCreatorRegisterController::class, 'register'])
+        ->name('campaign.creator.register');
+
+    // OTP Routes
+    Route::get('/otp/verify', [CampaignCreatorRegisterController::class, 'showOtpForm'])
+        ->name('verify.otp.form');
+
+    Route::post('/otp/verify', [CampaignCreatorRegisterController::class, 'verifyOtp'])
+        ->name('verify.otp');
+
+    Route::post('/otp/resend', [CampaignCreatorRegisterController::class, 'resendOtp'])
+        ->name('resend.otp');
+});
+
+Route::middleware(['auth', 'otp.verified'])->group(function () {
+    Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show');
+    Route::get('/profile/edit', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::post('/profile/password/update', [ProfileController::class, 'updatePassword'])->name('profile.password.update');
+});
+
 /*
 |--------------------------------------------------------------------------
 | Public Routes
