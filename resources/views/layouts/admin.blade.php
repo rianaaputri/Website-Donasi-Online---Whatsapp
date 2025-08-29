@@ -398,7 +398,7 @@
             <a href="{{ route('admin.list-admins') }}" 
                class="menu-item {{ request()->routeIs('admin.list-admins') ? 'active' : '' }}">
                 <i class="fas fa-users-cog"></i>
-                Manage Admins
+                Manage Pengguna & Admins
             </a>
 
             <!-- Divider -->
@@ -564,6 +564,26 @@
                 });
             }, 5000);
         });
+        function changeRole(userId, currentRole){
+    const newRole = prompt("Masukkan role baru:", currentRole);
+    if(!newRole) return;
+    
+    fetch('{{ route("admin.update-role") }}', {
+        method: 'POST',
+        headers:{
+            'Content-Type':'application/json',
+            'X-CSRF-TOKEN':'{{ csrf_token() }}'
+        },
+        body: JSON.stringify({user_id:userId, new_role:newRole})
+    })
+    .then(res=>res.json())
+    .then(data=>{
+        alert(data.message);
+        if(data.success) location.reload();
+    })
+    .catch(err=>console.error(err));
+}
+
     </script>
     
     @yield('scripts')

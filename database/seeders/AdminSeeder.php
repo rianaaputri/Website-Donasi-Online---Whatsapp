@@ -10,19 +10,23 @@ class AdminSeeder extends Seeder
 {
     public function run()
     {
-        DB::table('admins')->insert([
-
-            'name' => 'fatma',
-            'email' => 'fatma@gmail.com',
-            'password' => Hash::make('123456'), 
-
-            'name' => 'Silva',
-            'email' => 'silva@gmail.com',
-            'password' => Hash::make('123456'), // bcrypt otomatis
-
-            'email_verified_at' => now(),
-            'created_at' => now(),
-            'updated_at' => now(),
+        DB::table('users')->insert([
+            [
+                'name'       => 'Souta Izumi',
+                'phone'      => '6289656698186',
+                'role'       => 'admin',
+                'password'   => Hash::make('123456'),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'name'       => 'Mikazuki Arion',
+                'phone'      => '6283179277828',
+                'role'       => 'admin',
+                'password'   => Hash::make('123456'),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]
         ]);
     }
 }

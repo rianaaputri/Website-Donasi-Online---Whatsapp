@@ -16,64 +16,45 @@ class AdminController extends Controller
     }
 
     /**
-     * Tampilkan semua user (termasuk admin).
+     * Daftar admin / semua user
      */
-    public function listAdmins(Request $request)
+    public function index(Request $request)
     {
         try {
-            $query = User::query()
-                ->select('id', 'name', 'email', 'phone', 'address', 'role', 'is_active', 'email_verified_at', 'created_at');
+            $query = User::query()->select('id','name','phone','address','role','is_active','phone_verified_at','created_at');
 
-            // Search
             if ($request->filled('search')) {
                 $search = $request->search;
-                $query->where(function ($q) use ($search) {
-                    $q->where('name', 'like', "%{$search}%")
-                        ->orWhere('email', 'like', "%{$search}%")
-                        ->orWhere('phone', 'like', "%{$search}%");
-                });
+                $query->where(fn($q) => $q->where('name','like',"%{$search}%")
+                                        ->orWhere('phone','like',"%{$search}%"));
             }
 
-            // Filter role
             if ($request->filled('role')) {
                 $query->where('role', $request->role);
             }
 
-            // Filter status aktif
             if ($request->filled('status')) {
                 $query->where('is_active', $request->status === 'active' ? 1 : 0);
             }
 
-            // Filter verifikasi
             if ($request->filled('verification')) {
-                if ($request->verification === 'verified') {
-                    $query->whereNotNull('email_verified_at');
-                } else {
-                    $query->whereNull('email_verified_at');
-                }
+                $request->verification === 'verified'
+                    ? $query->whereNotNull('phone_verified_at')
+                    : $query->whereNull('phone_verified_at');
             }
 
-            $users = $query->orderBy('created_at', 'desc')->paginate(15);
+            $users = $query->orderBy('created_at','desc')->paginate(15);
 
-            // Statistik tiap user
-            foreach ($users as $user) {
-                $user->campaigns_count = Schema::hasTable('campaigns')
-                    ? DB::table('campaigns')->where('user_id', $user->id)->count()
-                    : 0;
-
-                $user->donations_count = Schema::hasTable('donations')
-                    ? DB::table('donations')->where('user_id', $user->id)->count()
-                    : 0;
-
-                $user->donations_total = Schema::hasTable('donations')
-                    ? DB::table('donations')->where('user_id', $user->id)->sum('amount')
-                    : 0;
+            foreach($users as $user){
+                $user->campaigns_count = Schema::hasTable('campaigns') ? DB::table('campaigns')->where('user_id',$user->id)->count() : 0;
+                $user->donations_count = Schema::hasTable('donations') ? DB::table('donations')->where('user_id',$user->id)->count() : 0;
+                $user->donations_total = Schema::hasTable('donations') ? DB::table('donations')->where('user_id',$user->id)->sum('amount') : 0;
             }
 
             return view('admin.list-admins', compact('users'));
         } catch (\Exception $e) {
-            Log::error('User listing error: ' . $e->getMessage());
-            return back()->with('error', 'Gagal memuat data user.');
+            Log::error('User listing error: '.$e->getMessage());
+            return back()->with('error','Gagal memuat data user.');
         }
     }
 
@@ -102,11 +83,11 @@ class AdminController extends Controller
             $user->role = $validated['new_role'];
             $user->save();
 
-            Log::info("Role {$user->email} diubah dari {$oldRole} ke {$user->role} oleh " . auth()->user()->email);
+            Log::info("Role {$user->phone} diubah dari {$oldRole} ke {$user->role} oleh " . auth()->user()->phone);
 
             return response()->json(['success' => true, 'message' => "Role berhasil diubah menjadi {$user->role}."]);
         } catch (\Exception $e) {
-            Log::error('Role update error: ' . $e->getMessage());
+            Log::error('Role update error: '.$e->getMessage());
             return response()->json(['success' => false, 'message' => 'Gagal mengubah role.']);
         }
     }
@@ -135,34 +116,8 @@ class AdminController extends Controller
 
             return response()->json(['success' => true, 'message' => $msg]);
         } catch (\Exception $e) {
-            Log::error('User status update error: ' . $e->getMessage());
+            Log::error('User status update error: '.$e->getMessage());
             return response()->json(['success' => false, 'message' => 'Gagal mengubah status user.']);
-        }
-    }
-
-    /**
-     * Verifikasi email user secara manual.
-     */
-    public function verifyEmail(Request $request)
-    {
-        $validated = $request->validate([
-            'user_id' => 'required|integer|exists:users,id',
-        ]);
-
-        try {
-            $user = User::findOrFail($validated['user_id']);
-
-            if ($user->hasVerifiedEmail()) {
-                return response()->json(['success' => false, 'message' => 'Email sudah terverifikasi.']);
-            }
-
-            $user->email_verified_at = now();
-            $user->save();
-
-            return response()->json(['success' => true, 'message' => 'Email berhasil diverifikasi.']);
-        } catch (\Exception $e) {
-            Log::error('Email verification error: ' . $e->getMessage());
-            return response()->json(['success' => false, 'message' => 'Gagal verifikasi email.']);
         }
     }
 
@@ -178,21 +133,13 @@ class AdminController extends Controller
         try {
             $user = User::findOrFail($validated['user_id']);
 
-            $user->campaigns_count = Schema::hasTable('campaigns')
-                ? DB::table('campaigns')->where('user_id', $user->id)->count()
-                : 0;
-
-            $user->donations_count = Schema::hasTable('donations')
-                ? DB::table('donations')->where('user_id', $user->id)->count()
-                : 0;
-
-            $user->donations_total = Schema::hasTable('donations')
-                ? DB::table('donations')->where('user_id', $user->id)->sum('amount')
-                : 0;
+            $user->campaigns_count = Schema::hasTable('campaigns') ? DB::table('campaigns')->where('user_id',$user->id)->count() : 0;
+            $user->donations_count = Schema::hasTable('donations') ? DB::table('donations')->where('user_id',$user->id)->count() : 0;
+            $user->donations_total = Schema::hasTable('donations') ? DB::table('donations')->where('user_id',$user->id)->sum('amount') : 0;
 
             return response()->json(['success' => true, 'user' => $user]);
         } catch (\Exception $e) {
-            Log::error('Show user error: ' . $e->getMessage());
+            Log::error('Show user error: '.$e->getMessage());
             return response()->json(['success' => false, 'message' => 'Gagal menampilkan detail user.']);
         }
     }
@@ -204,19 +151,62 @@ class AdminController extends Controller
     {
         try {
             $totalUsers = User::count();
-            $totalAdmins = User::where('role', 'admin')->count();
+            $totalAdmins = User::where('role','admin')->count();
             $totalCampaigns = Schema::hasTable('campaigns') ? DB::table('campaigns')->count() : 0;
             $totalDonations = Schema::hasTable('donations') ? DB::table('donations')->sum('amount') : 0;
 
-            return view('admin.dashboard', compact(
-                'totalUsers',
-                'totalAdmins',
-                'totalCampaigns',
-                'totalDonations'
-            ));
+            return view('admin.dashboard', compact('totalUsers','totalAdmins','totalCampaigns','totalDonations'));
         } catch (\Exception $e) {
-            Log::error('Dashboard error: ' . $e->getMessage());
-            return view('admin.dashboard')->with('error', 'Gagal memuat dashboard.');
+            Log::error('Dashboard error: '.$e->getMessage());
+            return view('admin.dashboard')->with('error','Gagal memuat dashboard.');
+        }
+    }
+
+    /**
+     * Hapus admin
+     */
+    public function deleteAdmin($id)
+    {
+        try {
+            $admin = User::findOrFail($id);
+
+            if ($admin->id === auth()->id()) {
+                return back()->with('error','Tidak bisa menghapus akun sendiri.');
+            }
+
+            $admin->delete();
+            return back()->with('success','Admin berhasil dihapus.');
+        } catch (\Exception $e) {
+            Log::error('Delete admin error: '.$e->getMessage());
+            return back()->with('error','Gagal menghapus admin.');
+        }
+    }
+
+    /**
+     * Verifikasi nomor telepon user
+     */
+    public function verifyPhone(Request $request)
+    {
+        $validated = $request->validate([
+            'user_id' => 'required|integer|exists:users,id',
+        ]);
+
+        try {
+            $user = User::findOrFail($validated['user_id']);
+
+            if ($user->phone_verified_at) {
+                return response()->json(['success' => false, 'message' => 'Nomor telepon sudah diverifikasi.']);
+            }
+
+            $user->phone_verified_at = now();
+            $user->save();
+
+            Log::info("Phone {$user->phone} diverifikasi oleh admin " . auth()->user()->phone);
+
+            return response()->json(['success' => true, 'message' => 'Nomor telepon berhasil diverifikasi.']);
+        } catch (\Exception $e) {
+            Log::error('Phone verify error: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Gagal memverifikasi nomor telepon.']);
         }
     }
 }
