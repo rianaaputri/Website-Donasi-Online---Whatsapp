@@ -70,7 +70,23 @@ class RegisteredUserController extends Controller
     }
     public function formOtp(): View
     {
-        return view('auth.otp');
+        $data = session('pending_register');
+    $remaining = 0;
+
+    if ($data) {
+        $otp = Otp::where('phone', $data['phone'])
+                ->latest()
+                ->first();
+
+        if ($otp) {
+            $remaining = now()->diffInSeconds($otp->expired_at, false);
+            $remaining = max(0, $remaining);
+        }
+    }
+
+    return view('auth.otp', [
+        'remainingTime' => $remaining
+    ]);
     }
     public function resendOtp()
 {
@@ -114,6 +130,7 @@ public function submitOtp(Request $request)
     $user->phone = $data['phone'];
     $user->role = $data['role'];
     $user->password = bcrypt($data['password']);
+    $user->phone_verified_at = now(); 
     $user->save();
 
     // Hapus session

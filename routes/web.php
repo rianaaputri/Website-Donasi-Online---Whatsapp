@@ -89,6 +89,7 @@ Route::prefix('donation')->name('donation.')->group(function () {
     Route::get('/success/{donation}', [DonationController::class, 'success'])->name('success');
     Route::get('/status/{donation}', [DonationController::class, 'checkStatus'])->name('status');
 
+
     Route::middleware(['auth', 'role.check:user,campaign_creator'])->group(function () {
         Route::get('/history', [DonationController::class, 'myDonations'])->name('history');
         Route::get('/pending', [DonationController::class, 'pending'])->name('pending');
