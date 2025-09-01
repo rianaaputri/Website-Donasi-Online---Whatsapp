@@ -240,15 +240,25 @@ function startCountdown(duration, display, progressRing) {
 
 // Start countdown pas load
 window.onload = function () {
-    const oneMinute = 1 * 60;
+    // ambil dari backend
+    const remaining = {{ $remainingTime }};
     const display = document.querySelector('#countdown');
     const progressRing = document.querySelector('.progress-ring');
 
     progressRing.style.strokeDasharray = '100';
     progressRing.style.strokeDashoffset = '0';
 
-    startCountdown(oneMinute, display, progressRing);
+    // Kalau sisa waktu masih ada, jalankan countdown
+    if (remaining > 0) {
+        startCountdown(remaining, display, progressRing);
+    } else {
+        display.textContent = "00:00";
+        display.classList.remove('text-blue-600');
+        display.classList.add('text-red-500');
+        document.getElementById('resendBtn').classList.remove('hidden');
+    }
 };
+
 
 // Disable/enable verify button sesuai OTP
 const otpInput = document.querySelector('input[name="otp"]');

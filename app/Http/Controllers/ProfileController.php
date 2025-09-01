@@ -183,7 +183,26 @@ class ProfileController extends Controller
      */
     public function formOtp(): View
     {
-        return view('profile.otp');
+         $data = session('pending_update');
+    $remaining = 0;
+
+    if ($data) {
+        $phone = $data['step'] === 'verify_old' 
+            ? Auth::user()->phone 
+            : $data['phone'];
+
+        $otp = Otp::where('phone', $phone)
+            ->latest()
+            ->first();
+
+        if ($otp) {
+            $remaining = max(0, now()->diffInSeconds($otp->expired_at, false));
+        }
+    }
+
+    return view('profile.otp', [
+        'remainingTime' => $remaining
+    ]);
     }
 
     /**

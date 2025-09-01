@@ -8,6 +8,11 @@ use App\Models\Donation;
 use App\Models\Campaign;
 use App\Services\MidtransService;
 use Midtrans\Transaction;
+use Midtrans\Snap;
+use Midtrans\CoreApi;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Http;
 
 class DonationController extends Controller
 {
@@ -120,51 +125,155 @@ class DonationController extends Controller
 
         return redirect()->route('donation.payment', $donation->id);
     }
+    private function kirimQRCodeWhatsApp($qrCodeUrl, $nomorHP, $orderId, $amount)
+{
+    $apiToken = env('JAPATI_APIOKEN');
+    $gateway  = env('JAPATI_GATEWAY_NUMBER');
+
+    try {
+        $response = Http::withBasicAuth(env('MIDTRANS_SERVER_KEY'), '')
+            ->get($qrCodeUrl);
+
+        if (!$response->successful()) {
+            Log::error("Gagal ambil QR code Midtrans: " . $response->body());
+            return false;
+        }
+
+        $fileName = 'qris_' . $orderId . '.png';
+        $fileData = $response->getBody()->getContents();
+    } catch (\Exception $e) {
+        Log::error("Exception ambil QR code: " . $e->getMessage());
+        return false;
+    }
+
+    $caption  = "🔄 QR Code Pembayaran\n\n";
+    $caption .= "Order ID: {$orderId}\n";
+    $caption .= "Nominal: Rp" . number_format($amount, 0, ',', '.') . "\n\n";
+    $caption .= "Silakan scan QR ini untuk membayar.\n\n";
+    $caption .= "Terima kasih! 🙏";
+
+    // ✅ Kirim multipart dengan caption
+    $res = Http::withHeaders([
+        'Authorization' => 'Bearer ' . $apiToken,
+    ])->asMultipart()->post('https://app.japati.id/api/send-message', [
+        [
+            'name'     => 'gateway',
+            'contents' => $gateway,
+        ],
+        [
+            'name'     => 'number',
+            'contents' => $nomorHP,
+        ],
+        [
+            'name'     => 'type',
+            'contents' => 'media',
+        ],
+        [
+            'name'     => 'caption',
+            'contents' => $caption, // ✅ pastikan ikut dikirim
+        ],
+        [
+            'name'     => 'media_file',
+            'contents' => $fileData,
+            'filename' => $fileName,
+        ],
+    ]);
+
+    if ($res->successful()) {
+        Log::info("✅ QR Code + caption berhasil dikirim ke WhatsApp: {$nomorHP}");
+        return true;
+    } else {
+        Log::error('❌ Gagal kirim QR Code via WA: ' . $res->body());
+        return false;
+    }
+}
+
+
 
     // =========================
     // Halaman payment Midtrans
     // =========================
-    public function payment($id)
-    {
-        $donation = Donation::findOrFail($id);
+  public function payment($id)
+{
+    $donation = Donation::findOrFail($id);
 
-        if (empty($donation->midtrans_order_id)) {
-            $donation->midtrans_order_id = 'DON-' . now()->format('Ymd') . '-' . strtoupper(uniqid());
-            $donation->save();
-        }
+    if (empty($donation->midtrans_order_id)) {
+        $donation->midtrans_order_id = 'DON-' . now()->format('Ymd') . '-' . strtoupper(uniqid());
+        $donation->save();
+    }
 
-        $params = [
-            'transaction_details' => [
-                'order_id' => $donation->midtrans_order_id,
-                'gross_amount' => (int) $donation->amount
-            ],
-            'customer_details' => [
-                'first_name' => $donation->donor_name,
-                'phone' => $donation->donor_phone
-            ],
-            'item_details' => [
-                [
-                    'id' => 'DON-' . $donation->campaign_id,
-                    'price' => (int) $donation->amount,
-                    'quantity' => 1,
-                    'name' => 'Donasi untuk ' . $donation->campaign->title
-                ]
-            ],
-            'enabled_payments' => [
-                'credit_card', 'gopay', 'shopeepay', 
-                'bank_transfer', 'echannel', 'bca_va', 
-                'bni_va', 'bri_va'
+    $params = [
+        'transaction_details' => [
+            'order_id' => $donation->midtrans_order_id,
+            'gross_amount' => (int) $donation->amount
+        ],
+        'customer_details' => [
+            'first_name' => $donation->donor_name,
+            'phone' => $donation->donor_phone
+        ],
+        'item_details' => [
+            [
+                'id' => 'DON-' . $donation->campaign_id,
+                'price' => (int) $donation->amount,
+                'quantity' => 1,
+                'name' => 'Donasi untuk ' . $donation->campaign->title
             ]
+        ],
+        'enabled_payments' => [
+            'credit_card', 'gopay', 'shopeepay', 
+            'bank_transfer', 'echannel', 'bca_va', 
+            'bni_va', 'bri_va'
+        ]
+    ];
+
+    try {
+        $orderId = $donation->midtrans_order_id;
+        $nominal = $donation->amount;
+
+        // ✅ Snap token untuk UI
+        $snapToken = Snap::getSnapToken($params);
+
+        // ✅ Generate QR code QRIS untuk dikirim ke WA
+        $qrParams = [
+            'payment_type' => 'qris',
+            'transaction_details' => [
+                'order_id' => $orderId . '-QR', // penting: bedakan order_id biar tidak bentrok dengan Snap
+                'gross_amount' => (int) $nominal
+            ],
+            'item_details' => $params['item_details'],
+            'customer_details' => $params['customer_details']
         ];
 
+        $qrCodeUrl = null;
         try {
-            $snapToken = $this->midtrans->getSnapToken($params);
-            return view('donation.payment', compact('snapToken', 'donation'));
-        } catch (\Exception $e) {
-            \Log::error('Midtrans Error: ' . $e->getMessage());
-            return redirect()->back()->with('error', 'Terjadi kesalahan saat memproses pembayaran.');
+            $qrResponse = CoreApi::charge($qrParams);
+            $qrCodeUrl = $qrResponse->actions[0]->url ?? null;
+
+            if ($qrCodeUrl && Auth::user()->phone) {
+                $this->kirimQRCodeWhatsApp(
+                    $qrCodeUrl, 
+                    Auth::user()->phone, 
+                    $orderId, 
+                    $nominal
+                );
+            }
+        } catch (\Exception $qrError) {
+            Log::warning('Gagal generate QR code: ' . $qrError->getMessage());
         }
+
+        // ✅ Render view Snap UI + kirim snapToken
+        return view('donation.payment', [
+            'donation' => $donation,
+            'snapToken' => $snapToken,
+            'qrCodeUrl' => $qrCodeUrl, // kalau mau ditampilkan juga di layar
+        ]);
+
+    } catch (\Exception $e) {
+        Log::error('Midtrans Error: ' . $e->getMessage());
+        return back()->with('error', 'Gagal membuat token pembayaran. Silakan coba lagi.');
     }
+}
+
 
     // =========================
     // Halaman sukses donasi

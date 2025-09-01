@@ -222,10 +222,17 @@
         
         // Start the countdown when the page loads
         window.onload = function () {
-            const twoMinutes = 1 * 60; // 2 minutes in seconds
-            const display = document.querySelector('#countdown');
-            startCountdown(twoMinutes, display);
-        };
+    const remaining = {{ $remainingTime }}; // sisa detik dari DB
+    const display = document.querySelector('#countdown');
+
+    if (remaining > 0) {
+        startCountdown(remaining, display);
+    } else {
+        display.textContent = "00:00";
+        display.classList.remove('text-primary-600');
+        display.classList.add('text-red-500');
+    }
+};
         
         // Auto move between OTP inputs (if we had multiple inputs)
         const otpInput = document.querySelector('input[name="otp"]');
